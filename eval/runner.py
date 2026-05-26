@@ -108,10 +108,24 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
     """
     Run the eval harness against the ground truth dataset.
 
+    Honors ONLY_CASES env var: comma-separated list of case_ids to include.
+    Useful for v1↔v2 comparisons on the same subset, or for debugging a
+    single flaky case without rerunning the whole suite.
+
     Returns:
         (per_case_results, aggregate_scores)
     """
     ground_truth_records = _load_ground_truth()
+
+    only_cases = os.environ.get("ONLY_CASES", "").strip()
+    if only_cases:
+        wanted = {c.strip() for c in only_cases.split(",") if c.strip()}
+        ground_truth_records = [r for r in ground_truth_records if r["case_id"] in wanted]
+        if not ground_truth_records:
+            raise ValueError(
+                f"ONLY_CASES={only_cases!r} matched no ground truth records."
+            )
+
     eval_cases: list[EvalCase] = []
 
     for gt in ground_truth_records:
