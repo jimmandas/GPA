@@ -1,0 +1,15 @@
+{
+  "patient_id": "pt_anon_0002",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2025_1089",
+      "date": "2025-10-22",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Post-resection changes left lower lobe. No evidence of local recurrence. Small pleural thickening at resection margin — stable from prior study.",
+      "ordering_indication": "Post-resection surveillance, 3 months post-lobectomy"
+    }
+  ]
+}

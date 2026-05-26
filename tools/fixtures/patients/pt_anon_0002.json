@@ -1,0 +1,26 @@
+{
+  "patient_id": "pt_anon_0002",
+  "age": 58,
+  "sex": "M",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2025_1103",
+      "date": "2025-10-18",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Post-resection surveillance, NSCLC left lower lobe"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.20",
+      "text": "Malignant neoplasm of lower lobe, left lung",
+      "date": "2025-07-14",
+      "status": "active",
+      "staging_note": "Clinical staging T2aN1M0, Stage IIA — pathologic staging not documented"
+    }
+  ],
+  "medications": []
+}

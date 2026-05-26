@@ -1,0 +1,24 @@
+{
+  "patient_id": "pt_anon_0001",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2026_0112",
+      "date": "2026-02-15",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "3.2cm right upper lobe mass with ipsilateral hilar adenopathy. No pleural effusion. No distant metastasis on chest imaging.",
+      "ordering_indication": "Pre-surgical staging"
+    },
+    {
+      "study_id": "img_2025_0893",
+      "date": "2025-10-02",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": false,
+      "finding": "New 2.8cm right upper lobe nodule. Recommend biopsy and staging workup.",
+      "ordering_indication": "Abnormal chest X-ray finding"
+    }
+  ]
+}

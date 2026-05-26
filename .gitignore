@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Virtualenvs
+.spike-venv/
+.venv/
+venv/
+
+# Local Claude settings
+.claude/settings.local.json
+
+# Runtime audit logs (regenerated on every eval run)
+decision_log/

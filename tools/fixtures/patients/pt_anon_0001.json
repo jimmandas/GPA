@@ -1,0 +1,47 @@
+{
+  "patient_id": "pt_anon_0001",
+  "age": 62,
+  "sex": "F",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2026_0012",
+      "date": "2026-02-10",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Pre-surgical staging, stage II NSCLC right upper lobe"
+    },
+    {
+      "auth_id": "auth_2025_0847",
+      "date": "2025-09-14",
+      "modality": "PET",
+      "body_region": "whole_body",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Initial staging workup, suspected NSCLC"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.10",
+      "text": "Malignant neoplasm of upper lobe, right lung",
+      "date": "2025-09-20",
+      "status": "active"
+    },
+    {
+      "code": "Z85.118",
+      "text": "Personal history of other malignant neoplasm of bronchus and lung",
+      "date": "2026-03-01",
+      "status": "historical"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Osimertinib",
+      "dose": "80mg daily",
+      "start_date": "2026-03-15",
+      "indication": "Adjuvant therapy post-resection, EGFR exon 19 deletion"
+    }
+  ]
+}

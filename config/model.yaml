@@ -1,0 +1,3 @@
+model_snapshot: "claude-opus-4-1-20250805"
+version: "1"
+# Changing model_snapshot requires version bump and full eval re-run.

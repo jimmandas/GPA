@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "findings",
+  "type": "object",
+  "required": ["case_id", "modality", "body_region", "indication_category", "completeness_flags", "raw_quotes"],
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {"type": "string", "minLength": 1},
+    "modality": {"type": "string", "minLength": 1},
+    "body_region": {"type": "string", "minLength": 1},
+    "indication_category": {
+      "type": "string",
+      "enum": ["initial_diagnosis", "staging", "post_treatment_surveillance", "treatment_response", "symptom_workup", "other"]
+    },
+    "completeness_flags": {
+      "type": "object",
+      "required": ["has_diagnosis_code", "has_prior_imaging", "has_treatment_history", "has_clinical_rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "has_diagnosis_code": {"type": "boolean"},
+        "has_prior_imaging": {"type": "boolean"},
+        "has_treatment_history": {"type": "boolean"},
+        "has_clinical_rationale": {"type": "boolean"}
+      }
+    },
+    "raw_quotes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text", "source_ref"],
+        "additionalProperties": false,
+        "properties": {
+          "text": {"type": "string", "minLength": 1},
+          "source_ref": {
+            "type": "string",
+            "enum": [
+              "imaging_request.indication_text",
+              "imaging_request.modality",
+              "imaging_request.body_region",
+              "clinical_indication.diagnosis_code",
+              "clinical_indication.diagnosis_text",
+              "clinical_indication.supporting_notes",
+              "clinical_indication.prior_imaging"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

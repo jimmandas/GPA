@@ -1,0 +1,24 @@
+{
+  "case_id": "case_0002",
+  "submitted_at": "2026-05-25T09:15:00Z",
+  "patient": {
+    "patient_id": "pt_anon_0002",
+    "age": 58,
+    "sex": "M"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Surveillance CT chest following left lower lobectomy for stage II NSCLC. Patient was seen by oncology; adjuvant therapy was discussed but decision is pending."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.20",
+    "diagnosis_text": "Malignant neoplasm of lower lobe, left lung",
+    "prior_imaging": [
+      {"modality": "CT", "date": "2025-10-22"}
+    ],
+    "supporting_notes": "Post-resection follow-up. Lobectomy performed 2025 — exact date not recorded in this submission. Clinical staging T2aN1M0. Pathologic staging not included. Adjuvant therapy discussed with oncologist; no medication initiated as of submission date."
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

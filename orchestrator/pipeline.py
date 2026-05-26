@@ -1,0 +1,246 @@
+"""
+GPA v4 Pipeline — orchestrator/pipeline.py
+
+Sequential pipeline function. Not a state machine.
+Calls all gates and agents in fixed order.
+Enforces write-before-emit: determination not returned until bilateral
+logger confirms a durable write.
+
+Entry point: run_pipeline(submission: dict) -> dict
+"""
+
+import asyncio
+import json
+import hashlib
+from datetime import datetime, timezone
+from dataclasses import dataclass
+
+from gates.admission import admit
+from gates.source_verification import verify
+from gates.ai_decision_limit import check as check_ai_decision_limit, AIDecisionAttemptError
+from gates.denial import check as check_denial, DenialAttemptError
+
+from agents.evidence_summarizer import agent as evidence_summarizer
+from agents.context_retriever import agent as context_retriever
+from agents.policy_mapper import agent as policy_mapper
+from agents.reasoning_drafter import agent as reasoning_drafter
+
+from logs.bilateral_logger import get_logger, BilateralLoggerError
+
+
+# ---------------------------------------------------------------------------
+# Result dataclass
+# ---------------------------------------------------------------------------
+
+@dataclass
+class PipelineResult:
+    case_id: str
+    status: str                  # "completed" | "escalated" | "failed"
+    determination: dict | None   # None if escalated or failed
+    escalation_reason: str | None
+    audit_log_ref: str           # path to decision_log/{case_id}.jsonl
+
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+
+
+def _sha256(text: str) -> str:
+    return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _build_pre_state_record(case_id, submission, findings, context, policy_map, reasoning_brief) -> dict:
+    return {
+        "type": "pre_state_record",
+        "case_id": case_id,
+        "submission_hash": _sha256(json.dumps(submission, sort_keys=True, separators=(',', ':'))),
+        "findings_hash": _sha256(json.dumps(findings, sort_keys=True, separators=(',', ':'))),
+        "context_hash": _sha256(json.dumps(context, sort_keys=True, separators=(',', ':'))),
+        "policy_map_hash": _sha256(json.dumps(policy_map, sort_keys=True, separators=(',', ':'))),
+        "reasoning_brief_hash": _sha256(json.dumps(reasoning_brief, sort_keys=True, separators=(',', ':'))),
+        "at": _now_iso(),
+    }
+
+
+def _log_escalation(case_id: str, reason: str, detail) -> None:
+    record = {
+        "type": "escalation_event",
+        "case_id": case_id,
+        "reason": reason,
+        "detail": str(detail),
+        "at": _now_iso(),
+    }
+    try:
+        get_logger().commit(case_id, record)
+    except BilateralLoggerError:
+        pass  # best-effort on escalation logging
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+def run_pipeline(submission: dict) -> PipelineResult:
+    """
+    Synchronous entry point. Runs the full GPA pipeline for one submission.
+
+    Args:
+        submission: The raw submission dict.
+
+    Returns:
+        PipelineResult with status "completed", "escalated", or "failed".
+    """
+    return asyncio.run(_run_async(submission))
+
+
+# ---------------------------------------------------------------------------
+# Async pipeline implementation
+# ---------------------------------------------------------------------------
+
+async def _run_async(submission: dict) -> PipelineResult:
+    """The actual pipeline — all steps run in sequence."""
+
+    # STEP 1 — Extract case_id and patient_id
+    case_id = submission.get("case_id", "unknown")
+    patient_id = submission.get("patient", {}).get("patient_id", "unknown")
+
+    try:
+        # STEP 2 — Admission Gate
+        result = admit(submission)
+        if not result.admitted:
+            return PipelineResult(
+                case_id=case_id,
+                status="escalated",
+                determination=None,
+                escalation_reason=f"admission_gate_failed: {result.missing_fields}",
+                audit_log_ref=f"decision_log/{case_id}.jsonl"
+            )
+
+        # STEP 3 — Evidence Summarizer (Agent 1)
+        findings = await evidence_summarizer.run(submission, case_id)
+        check_ai_decision_limit(findings, "evidence_summarizer")
+
+        # STEP 4 — Context Retriever (Agent 2)
+        context = await context_retriever.run(findings, patient_id, case_id)
+        check_ai_decision_limit(context, "context_retriever")
+
+        # STEP 5 — Policy Mapper (Agent 3)
+        policy_map = await policy_mapper.run(findings, context, case_id)
+        check_ai_decision_limit(policy_map, "policy_mapper")
+
+        # STEP 6 — Reasoning Drafter (Agent 4)
+        reasoning_brief = await reasoning_drafter.run(findings, context, policy_map, case_id)
+        check_ai_decision_limit(reasoning_brief, "reasoning_drafter")
+
+        # STEP 7 — Source Verification Gate
+        sv_result = verify(reasoning_brief)
+        if not sv_result.passed:
+            _log_escalation(case_id, "source_verification_failed", sv_result.violations)
+            return PipelineResult(
+                case_id=case_id,
+                status="escalated",
+                determination=None,
+                escalation_reason=f"source_verification_failed: {sv_result.violations}",
+                audit_log_ref=f"decision_log/{case_id}.jsonl"
+            )
+
+        # STEP 8 — Bilateral Logger PRE-WRITE (write-before-emit)
+        pre_state = _build_pre_state_record(
+            case_id, submission, findings, context, policy_map, reasoning_brief
+        )
+        get_logger().commit(case_id, pre_state)
+        # If this raises BilateralLoggerError → propagates up, do not emit
+
+        # STEP 9 — Return reasoning_brief for nurse review
+        determination = {
+            "case_id": case_id,
+            "status": "pending_nurse_review",
+            "reasoning_brief": reasoning_brief,
+            "policy_map": policy_map,
+            "context": context,
+            "audit_log_ref": f"decision_log/{case_id}.jsonl"
+        }
+
+        return PipelineResult(
+            case_id=case_id,
+            status="completed",
+            determination=determination,
+            escalation_reason=None,
+            audit_log_ref=f"decision_log/{case_id}.jsonl"
+        )
+
+    except (BilateralLoggerError, AIDecisionAttemptError) as exc:
+        return PipelineResult(
+            case_id=case_id,
+            status="failed",
+            determination=None,
+            escalation_reason=str(exc),
+            audit_log_ref=f"decision_log/{case_id}.jsonl"
+        )
+    except Exception as exc:
+        return PipelineResult(
+            case_id=case_id,
+            status="failed",
+            determination=None,
+            escalation_reason=f"unexpected_error: {exc}",
+            audit_log_ref=f"decision_log/{case_id}.jsonl"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Nurse decision recording
+# ---------------------------------------------------------------------------
+
+def record_nurse_decision(case_id: str, action: str, rationale: str) -> PipelineResult:
+    """
+    Record a nurse's decision after reviewing the AI brief.
+
+    - Runs Denial Gate check on action
+    - Writes post-state record to bilateral logger (write-before-emit)
+    - Returns PipelineResult with final determination
+
+    Args:
+        case_id:   The case identifier.
+        action:    "approve" | "escalate" | "pend"
+        rationale: Required nurse rationale (non-empty).
+
+    Raises:
+        ValueError: if rationale is empty or whitespace-only.
+        DenialAttemptError: if action is "deny" or unknown.
+        BilateralLoggerError: if logger fails to commit.
+    """
+    if not rationale or not rationale.strip():
+        raise ValueError("Nurse rationale is required and cannot be empty.")
+
+    # Denial Gate
+    check_denial({"path": action})
+
+    # Post-state bilateral log record
+    post_state = {
+        "type": "nurse_action_record",
+        "case_id": case_id,
+        "nurse_decision": action,
+        "rationale": rationale,
+        "at": _now_iso(),
+    }
+    get_logger().commit(case_id, post_state)
+
+    determination = {
+        "case_id": case_id,
+        "path": action,
+        "rationale": rationale,
+        "audit_log_ref": f"decision_log/{case_id}.jsonl",
+        "at": _now_iso(),
+    }
+
+    return PipelineResult(
+        case_id=case_id,
+        status="completed",
+        determination=determination,
+        escalation_reason=None,
+        audit_log_ref=f"decision_log/{case_id}.jsonl"
+    )

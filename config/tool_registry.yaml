@@ -1,0 +1,14 @@
+# SHA-256 hashes of tool fixture files.
+# Computed from raw bytes of the fixture file at registration time.
+# Any edit to a fixture file requires updating this hash.
+
+patient_history_lookup:
+  pt_anon_0001: "sha256:9ce94b7b3f4c9c911226329ff15d6956a32ca33995eece6f173e6eacb6458120"
+  pt_anon_0002: "sha256:33e2ffbd75abed95a2ee7c957cfb48b97a69cde6cabf9e57367fd8b154956a12"
+
+prior_imaging_lookup:
+  pt_anon_0001_CT: "sha256:0612b7d19dfb4d53e5ae6a13dd9ffc6370d7c6ec4d47f1787acc2aff3488abc5"
+  pt_anon_0002_CT: "sha256:46c90cc25f2e6f14f5ab7f326b033d323c491805296ba30fbe716cb9efb9d483"
+
+nccn_passage_lookup:
+  post_treatment_surveillance_CT: "sha256:32a2e16c5434807265ab1083c0b512c628b20b08f58998635c85824852681fda"

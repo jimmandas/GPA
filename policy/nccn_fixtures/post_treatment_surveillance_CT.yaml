@@ -1,0 +1,37 @@
+# NCCN NSCLC Guidelines v2.2025 — Post-Treatment Surveillance
+# Indication: post_treatment_surveillance | Modality: CT
+# Source: NCCN Clinical Practice Guidelines in Oncology, Non-Small Cell Lung Cancer
+# Note: Fixture data for POC. Not a verbatim reproduction of proprietary NCCN text.
+
+indication_category: post_treatment_surveillance
+modality: CT
+
+criteria:
+  - passage_id: NCCN-NSCLC-SURV-1
+    criterion_text: >
+      CT chest with or without contrast is recommended every 3-6 months
+      for the first 2 years following curative-intent resection of NSCLC.
+      The interval must be consistent with the date of the most recent prior imaging study.
+    required_evidence:
+      - prior surgical resection documented in clinical notes or supporting_notes
+      - prior imaging within 3-6 months of current request date
+
+  - passage_id: NCCN-NSCLC-SURV-2
+    criterion_text: >
+      Patient must have a confirmed diagnosis of NSCLC with documented
+      pathologic staging (Stage I-III) prior to surveillance imaging.
+      An ICD-10 code consistent with lung malignancy (C34.x) must be present.
+    required_evidence:
+      - ICD-10 code in C34.x range
+      - prior staging documentation
+
+  - passage_id: NCCN-NSCLC-SURV-3
+    criterion_text: >
+      Surveillance CT imaging is indicated for patients receiving adjuvant
+      systemic therapy (including EGFR-targeted agents, immunotherapy, or
+      chemotherapy) following resection, to monitor for recurrence and
+      assess ongoing treatment appropriateness.
+    required_evidence:
+      - documented adjuvant therapy in patient history or supporting_notes
+
+overall_policy_reference: "NCCN NSCLC v2.2025, SURV-1 through SURV-3"

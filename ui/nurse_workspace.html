@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPA v4 · Nurse Workspace</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f6f8;
+      color: #1a1d23;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e2e5ea;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    header a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-size: 0.8rem;
+    }
+
+    header a:hover { text-decoration: underline; }
+
+    .header-sep { color: #d1d5db; }
+
+    header h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1d23;
+    }
+
+    .header-meta {
+      font-size: 0.8rem;
+      color: #6b7280;
+      display: flex;
+      gap: 12px;
+    }
+
+    .header-meta span {
+      background: #f3f4f6;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    main {
+      flex: 1;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    /* ---- Error / empty states ---- */
+    .state-message {
+      margin: 48px auto;
+      text-align: center;
+      color: #6b7280;
+      font-size: 0.95rem;
+    }
+
+    /* ---- Three-panel layout ---- */
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .panels { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #e2e5ea;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e2e5ea;
+      background: #f9fafb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .panel-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #374151;
+    }
+
+    .panel-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ---- AI disclaimer banner ---- */
+    .ai-banner {
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #92400e;
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+
+    /* ---- Sections within panels ---- */
+    .sub-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+
+    /* ---- Evidence claims ---- */
+    .evidence-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .evidence-item {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      color: #14532d;
+    }
+
+    .evidence-item .claim-text {
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .evidence-item .claim-ref {
+      font-size: 0.68rem;
+      color: #6b7280;
+      margin-top: 3px;
+      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+    }
+
+    .type-pill {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      margin-right: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .type-diagnosis  { background: #ede9fe; color: #5b21b6; }
+    .type-imaging    { background: #dbeafe; color: #1d4ed8; }
+    .type-medication { background: #fce7f3; color: #9d174d; }
+
+    /* ---- Uncertainty flags ---- */
+    .flags-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .flag-item {
+      background: #fffbeb;
+      border: 1px solid #fbbf24;
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+    }
+
+    .flag-icon {
+      margin-right: 5px;
+    }
+
+    .flag-issue {
+      font-weight: 600;
+      color: #78350f;
+      line-height: 1.4;
+    }
+
+    .flag-hint {
+      font-size: 0.72rem;
+      color: #92400e;
+      margin-top: 4px;
+      line-height: 1.4;
+      font-style: italic;
+    }
+
+    /* ---- Focal points ---- */
+    .focal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .focal-item {
+      background: #f8f9fa;
+      border: 1px solid #e2e5ea;
+      border-left: 3px solid #3b82f6;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+    }
+
+    .focal-point {
+      font-weight: 600;
+      color: #1d4ed8;
+      line-height: 1.4;
+    }
+
+    .focal-why {
+      font-size: 0.72rem;
+      color: #6b7280;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+
+    /* ---- AI rationale text ---- */
+    .ai-rationale-text {
+      background: #f9fafb;
+      border: 1px solid #e2e5ea;
+      border-radius: 5px;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      color: #374151;
+      line-height: 1.6;
+      font-style: italic;
+    }
+
+    /* ---- Policy map ---- */
+    .criteria-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .criterion-item {
+      border: 1px solid #e2e5ea;
+      border-radius: 5px;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .criterion-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+
+    .dot-met       { background: #22c55e; }
+    .dot-unmet     { background: #ef4444; }
+    .dot-ambiguous { background: #f97316; }
+
+    .criterion-body { flex: 1; }
+
+    .criterion-id {
+      font-size: 0.68rem;
+      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+      color: #6b7280;
+      margin-bottom: 3px;
+    }
+
+    .criterion-text-body {
+      color: #374151;
+      line-height: 1.4;
+    }
+
+    .criterion-status-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 8px;
+      border-radius: 99px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .status-met       { background: #dcfce7; color: #15803d; }
+    .status-unmet     { background: #fee2e2; color: #b91c1c; }
+    .status-ambiguous { background: #ffedd5; color: #c2410c; }
+
+    .overall-signal-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #e2e5ea;
+    }
+
+    .overall-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+      flex: 1;
+    }
+
+    .overall-badge {
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .overall-meets_criteria    { background: #dcfce7; color: #15803d; }
+    .overall-does_not_meet     { background: #fee2e2; color: #b91c1c; }
+    .overall-ambiguous         { background: #ffedd5; color: #c2410c; }
+
+    /* ---- Context panel ---- */
+    .context-section + .context-section { margin-top: 14px; }
+
+    .context-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+
+    .context-table th {
+      text-align: left;
+      padding: 5px 8px;
+      background: #f9fafb;
+      color: #6b7280;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #e2e5ea;
+    }
+
+    .context-table td {
+      padding: 6px 8px;
+      vertical-align: top;
+      border-bottom: 1px solid #f3f4f6;
+      color: #374151;
+      line-height: 1.4;
+    }
+
+    .context-table tr:last-child td { border-bottom: none; }
+
+    .outcome-badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-size: 0.65rem;
+      font-weight: 600;
+    }
+
+    .outcome-approved { background: #dcfce7; color: #15803d; }
+    .outcome-denied   { background: #fee2e2; color: #b91c1c; }
+    .outcome-pended   { background: #f3f4f6; color: #6b7280; }
+
+    .diag-code {
+      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+      font-size: 0.72rem;
+      color: #5b21b6;
+    }
+
+    /* ---- Rationale + actions bar ---- */
+    .action-bar {
+      background: #fff;
+      border: 1px solid #e2e5ea;
+      border-radius: 8px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .action-bar-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #374151;
+    }
+
+    #rationale {
+      width: 100%;
+      min-height: 72px;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      color: #1a1d23;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    #rationale:focus { border-color: #3b82f6; }
+
+    #rationale:disabled {
+      background: #f9fafb;
+      color: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 9px 20px;
+      border-radius: 6px;
+      border: none;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, background 0.15s;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-approve  { background: #22c55e; color: #fff; }
+    .btn-escalate { background: #f97316; color: #fff; }
+    .btn-pend     { background: #6b7280; color: #fff; }
+
+    .btn:not(:disabled).btn-approve:hover  { background: #16a34a; }
+    .btn:not(:disabled).btn-escalate:hover { background: #ea580c; }
+    .btn:not(:disabled).btn-pend:hover     { background: #4b5563; }
+
+    /* ---- Inline feedback ---- */
+    #action-feedback {
+      font-size: 0.82rem;
+      padding: 8px 12px;
+      border-radius: 5px;
+      display: none;
+    }
+
+    #action-feedback.success {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+      display: block;
+    }
+
+    #action-feedback.error {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+      display: block;
+    }
+
+    .divider { height: 1px; background: #e2e5ea; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="queue.html">← Case Queue</a>
+  <span class="header-sep">|</span>
+  <h1>GPA v4 · Nurse Workspace</h1>
+  <div class="header-meta" id="header-meta"></div>
+</header>
+
+<main id="main-content">
+  <p class="state-message">Loading…</p>
+</main>
+
+<script>
+/* ------------------------------------------------------------------ */
+/*  Fixture data                                                        */
+/* ------------------------------------------------------------------ */
+const FIXTURES = {
+  "case_0001": {
+    case_id: "case_0001",
+    patient: { patient_id: "pt_anon_0001", age: 62, sex: "F" },
+    imaging_request: { modality: "CT", body_region: "Chest", with_contrast: true },
+    reasoning_brief: {
+      supporting_evidence: [
+        { claim: "Biopsy-proven stage II NSCLC, right upper lobe", source_ref: "imaging_request.indication_text", type: "diagnosis" },
+        { claim: "Post-resection surveillance, 3 months following lobectomy", source_ref: "imaging_request.indication_text", type: "imaging" },
+        { claim: "ICD-10 C34.10 — Malignant neoplasm of upper lobe, right lung", source_ref: "clinical_indication.diagnosis_code", type: "diagnosis" },
+        { claim: "Prior CT chest on 2026-02-15 — within 3-6 month surveillance window", source_ref: "patient_context.imaging_history", type: "imaging" },
+        { claim: "Osimertinib 80mg daily initiated 2026-03-15 (adjuvant, EGFR exon 19 deletion)", source_ref: "patient_context.medications", type: "medication" }
+      ],
+      uncertainty_flags: [],
+      nurse_focal_points: [
+        { point: "Confirm surveillance interval is within NCCN 3-6 month window", why: "Last CT was 2026-02-15; current request is May 2026 — confirm 3-month interval is appropriate for this patient's protocol." },
+        { point: "Verify adjuvant therapy is ongoing", why: "Osimertinib listed as active; confirm patient has not discontinued." }
+      ],
+      ai_rationale: "The submission documents post-resection surveillance for biopsy-proven stage II NSCLC. All three NCCN surveillance criteria appear met: timing is within the 3-6 month window, pathologic staging is documented, and adjuvant therapy (Osimertinib) is confirmed. No uncertainty flags identified. This case is ready for nurse review."
+    },
+    policy_map: {
+      overall_signal: "meets_criteria",
+      criteria: [
+        { passage_id: "NCCN-NSCLC-SURV-1", criterion_text: "CT chest recommended every 3-6 months for first 2 years post-resection.", status: "met", evidence_ref: "patient_context.imaging_history" },
+        { passage_id: "NCCN-NSCLC-SURV-2", criterion_text: "Confirmed NSCLC diagnosis with documented pathologic staging (Stage I-III).", status: "met", evidence_ref: "clinical_indication.diagnosis_code" },
+        { passage_id: "NCCN-NSCLC-SURV-3", criterion_text: "Surveillance CT indicated for patients on adjuvant systemic therapy.", status: "met", evidence_ref: "patient_context.medications" }
+      ]
+    },
+    context: {
+      prior_authorizations: [
+        { auth_id: "auth_2026_0012", date: "2026-02-10", modality: "CT", outcome: "approved", indication: "Pre-surgical staging" },
+        { auth_id: "auth_2025_0847", date: "2025-09-14", modality: "PET", outcome: "approved", indication: "Initial staging workup" }
+      ],
+      imaging_history: [
+        { date: "2026-02-15", modality: "CT", body_region: "chest", finding: "3.2cm RUL mass, ipsilateral hilar adenopathy. No pleural effusion." },
+        { date: "2025-10-02", modality: "CT", body_region: "chest", finding: "New 2.8cm RUL nodule. Recommend biopsy and staging." }
+      ],
+      relevant_diagnoses: [
+        { code: "C34.10", text: "Malignant neoplasm of upper lobe, right lung", date: "2025-09-20", status: "active" }
+      ]
+    }
+  },
+  "case_0002": {
+    case_id: "case_0002",
+    patient: { patient_id: "pt_anon_0002", age: 58, sex: "M" },
+    imaging_request: { modality: "CT", body_region: "Chest", with_contrast: true },
+    reasoning_brief: {
+      supporting_evidence: [
+        { claim: "ICD-10 C34.20 — Malignant neoplasm of lower lobe, left lung", source_ref: "clinical_indication.diagnosis_code", type: "diagnosis" },
+        { claim: "Clinical staging T2aN1M0, Stage IIA documented", source_ref: "patient_context.relevant_diagnoses", type: "diagnosis" },
+        { claim: "Prior CT chest on 2025-10-22 — post-resection surveillance confirmed", source_ref: "patient_context.imaging_history", type: "imaging" }
+      ],
+      uncertainty_flags: [
+        { issue: "Last CT was 2025-10-22 — 7 months prior, outside the NCCN 3-6 month surveillance window. Resection date not recorded; cannot confirm 2-year surveillance window eligibility.", source_ref: "patient_context.imaging_history", resolution_hint: "Request operative report or discharge summary confirming resection date and surgical pathology." },
+        { issue: "Only clinical staging documented (T2aN1M0). Pathologic staging from surgical specimen not included in submission.", source_ref: "patient_context.relevant_diagnoses", resolution_hint: "Request pathology report confirming post-resection pathologic stage." },
+        { issue: "No adjuvant therapy documented. Supporting notes reference 'adjuvant therapy discussed' but no medication initiated as of submission date.", source_ref: "patient_context.medications", resolution_hint: "Confirm with ordering oncologist whether adjuvant therapy has been initiated or if patient is being monitored without systemic therapy." }
+      ],
+      nurse_focal_points: [
+        { point: "Resolve imaging timing gap", why: "7-month interval exceeds NCCN 3-6 month window. Clinical justification required." },
+        { point: "Obtain pathologic staging documentation", why: "NCCN requires confirmed pathologic staging, not clinical staging, for surveillance eligibility." },
+        { point: "Confirm adjuvant therapy status", why: "SURV-3 criterion requires documented therapy; 'discussed' does not satisfy the criterion." }
+      ],
+      ai_rationale: "This case presents three documentation gaps that prevent a clear policy determination. The imaging interval exceeds the NCCN surveillance window, pathologic staging is absent, and adjuvant therapy has not been initiated as of submission. All three NCCN criteria are ambiguous or unmet. The nurse must resolve these gaps before a determination can be made."
+    },
+    policy_map: {
+      overall_signal: "ambiguous",
+      criteria: [
+        { passage_id: "NCCN-NSCLC-SURV-1", criterion_text: "CT chest recommended every 3-6 months for first 2 years post-resection.", status: "ambiguous", evidence_ref: "patient_context.imaging_history" },
+        { passage_id: "NCCN-NSCLC-SURV-2", criterion_text: "Confirmed NSCLC diagnosis with documented pathologic staging (Stage I-III).", status: "ambiguous", evidence_ref: "patient_context.relevant_diagnoses" },
+        { passage_id: "NCCN-NSCLC-SURV-3", criterion_text: "Surveillance CT indicated for patients on adjuvant systemic therapy.", status: "unmet", evidence_ref: "patient_context.medications" }
+      ]
+    },
+    context: {
+      prior_authorizations: [
+        { auth_id: "auth_2025_1103", date: "2025-10-18", modality: "CT", outcome: "approved", indication: "Post-resection surveillance, NSCLC left lower lobe" }
+      ],
+      imaging_history: [
+        { date: "2025-10-22", modality: "CT", body_region: "chest", finding: "Post-resection changes LLL. No local recurrence. Small pleural thickening — stable." }
+      ],
+      relevant_diagnoses: [
+        { code: "C34.20", text: "Malignant neoplasm of lower lobe, left lung", date: "2025-07-14", status: "active" }
+      ]
+    }
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                             */
+/* ------------------------------------------------------------------ */
+function esc(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function statusDotClass(s)   { return { met: "dot-met", unmet: "dot-unmet", ambiguous: "dot-ambiguous" }[s] || "dot-ambiguous"; }
+function statusLabelClass(s) { return { met: "status-met", unmet: "status-unmet", ambiguous: "status-ambiguous" }[s] || "status-ambiguous"; }
+function statusLabel(s)      { return { met: "Met ✓", unmet: "Unmet ✗", ambiguous: "Ambiguous ?" }[s] || s; }
+function overallClass(s)     { return "overall-" + s; }
+function overallLabel(s)     { return { meets_criteria: "Meets Criteria", does_not_meet: "Does Not Meet", ambiguous: "Ambiguous" }[s] || s; }
+function typePillClass(t)    { return "type-" + t; }
+function outcomeClass(o)     { return "outcome-" + o; }
+
+/* ------------------------------------------------------------------ */
+/*  Panel renderers                                                     */
+/* ------------------------------------------------------------------ */
+function renderAIBrief(brief) {
+  const evidenceHTML = brief.supporting_evidence.map(e => `
+    <div class="evidence-item">
+      <span class="type-pill ${typePillClass(e.type)}">${esc(e.type)}</span>
+      <span class="claim-text">${esc(e.claim)}</span>
+      <div class="claim-ref">${esc(e.source_ref)}</div>
+    </div>
+  `).join("");
+
+  const flagsHTML = brief.uncertainty_flags.length === 0
+    ? `<p style="font-size:0.78rem;color:#6b7280;font-style:italic;">No uncertainty flags.</p>`
+    : brief.uncertainty_flags.map(f => `
+      <div class="flag-item">
+        <div class="flag-issue"><span class="flag-icon">⚠</span>${esc(f.issue)}</div>
+        <div class="flag-hint">Resolution: ${esc(f.resolution_hint)}</div>
+      </div>
+    `).join("");
+
+  const focalHTML = brief.nurse_focal_points.map(fp => `
+    <div class="focal-item">
+      <div class="focal-point">${esc(fp.point)}</div>
+      <div class="focal-why">${esc(fp.why)}</div>
+    </div>
+  `).join("");
+
+  return `
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">AI Brief</span>
+      </div>
+      <div class="panel-body">
+        <div class="ai-banner">AI-Generated · Not a Clinical Decision</div>
+
+        <div>
+          <p class="sub-title">Supporting Evidence</p>
+          <div class="evidence-list">${evidenceHTML}</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <p class="sub-title">⚠ Uncertainty Flags</p>
+          <div class="flags-list">${flagsHTML}</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <p class="sub-title">Focal Points for Nurse</p>
+          <div class="focal-list">${focalHTML}</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <p class="sub-title">AI Rationale</p>
+          <div class="ai-rationale-text">${esc(brief.ai_rationale)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPolicyMap(pm) {
+  const criteriaHTML = pm.criteria.map(c => `
+    <div class="criterion-item">
+      <span class="criterion-status-dot ${statusDotClass(c.status)}"></span>
+      <div class="criterion-body">
+        <div class="criterion-id">${esc(c.passage_id)}</div>
+        <div class="criterion-text-body">${esc(c.criterion_text)}</div>
+      </div>
+      <span class="criterion-status-label ${statusLabelClass(c.status)}">${statusLabel(c.status)}</span>
+    </div>
+  `).join("");
+
+  return `
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Policy Map</span>
+      </div>
+      <div class="panel-body">
+        <div>
+          <p class="sub-title">Criteria</p>
+          <div class="criteria-list">${criteriaHTML}</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <p class="sub-title">Overall Signal</p>
+          <div class="overall-signal-row">
+            <span class="overall-label">AI Assessment</span>
+            <span class="overall-badge ${overallClass(pm.overall_signal)}">${overallLabel(pm.overall_signal)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderContext(ctx) {
+  const priorAuthRows = ctx.prior_authorizations.map(a => `
+    <tr>
+      <td style="font-family:monospace;font-size:0.72rem;color:#6b7280">${esc(a.auth_id)}</td>
+      <td>${esc(a.date)}</td>
+      <td>${esc(a.modality)}</td>
+      <td><span class="outcome-badge ${outcomeClass(a.outcome)}">${esc(a.outcome)}</span></td>
+      <td>${esc(a.indication)}</td>
+    </tr>
+  `).join("");
+
+  const imagingRows = ctx.imaging_history.map(i => `
+    <tr>
+      <td>${esc(i.date)}</td>
+      <td>${esc(i.modality)}</td>
+      <td>${esc(i.body_region)}</td>
+      <td>${esc(i.finding)}</td>
+    </tr>
+  `).join("");
+
+  const diagRows = ctx.relevant_diagnoses.map(d => `
+    <tr>
+      <td><span class="diag-code">${esc(d.code)}</span></td>
+      <td>${esc(d.text)}</td>
+      <td>${esc(d.date)}</td>
+      <td><span class="outcome-badge ${d.status === 'active' ? 'outcome-approved' : 'outcome-pended'}">${esc(d.status)}</span></td>
+    </tr>
+  `).join("");
+
+  return `
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Patient Context</span>
+      </div>
+      <div class="panel-body">
+        <div class="context-section">
+          <p class="sub-title">Prior Authorizations</p>
+          <table class="context-table">
+            <thead><tr><th>Auth ID</th><th>Date</th><th>Mod.</th><th>Outcome</th><th>Indication</th></tr></thead>
+            <tbody>${priorAuthRows}</tbody>
+          </table>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="context-section">
+          <p class="sub-title">Imaging History</p>
+          <table class="context-table">
+            <thead><tr><th>Date</th><th>Mod.</th><th>Region</th><th>Finding</th></tr></thead>
+            <tbody>${imagingRows}</tbody>
+          </table>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="context-section">
+          <p class="sub-title">Relevant Diagnoses</p>
+          <table class="context-table">
+            <thead><tr><th>Code</th><th>Diagnosis</th><th>Date</th><th>Status</th></tr></thead>
+            <tbody>${diagRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main                                                                */
+/* ------------------------------------------------------------------ */
+function getCaseId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("case_id");
+}
+
+function setButtons(enabled) {
+  document.getElementById("btn-approve").disabled  = !enabled;
+  document.getElementById("btn-escalate").disabled = !enabled;
+  document.getElementById("btn-pend").disabled     = !enabled;
+}
+
+function showFeedback(msg, type) {
+  const el = document.getElementById("action-feedback");
+  el.textContent = msg;
+  el.className = type; // "success" or "error"
+}
+
+async function submitDecision(caseId, action) {
+  const rationale = document.getElementById("rationale").value;
+  setButtons(false);
+
+  try {
+    const res = await fetch("/api/v1/pa/nurse-decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ case_id: caseId, action, rationale })
+    });
+
+    if (!res.ok) {
+      let errMsg = `Server returned ${res.status}`;
+      try { const body = await res.json(); errMsg = body.detail || body.message || errMsg; } catch (_) {}
+      showFeedback(`Error: ${errMsg}`, "error");
+      setButtons(true);
+      return;
+    }
+
+    showFeedback(`Case ${caseId} marked as "${action}". Decision recorded.`, "success");
+    document.getElementById("rationale").disabled = true;
+    // buttons stay disabled — decision made
+  } catch (err) {
+    showFeedback(`Network error: ${err.message}`, "error");
+    setButtons(true);
+  }
+}
+
+function init() {
+  const caseId = getCaseId();
+  const main = document.getElementById("main-content");
+
+  if (!caseId) {
+    main.innerHTML = `<p class="state-message">No case selected. <a href="queue.html">← Return to queue</a></p>`;
+    return;
+  }
+
+  const data = FIXTURES[caseId];
+  if (!data) {
+    main.innerHTML = `<p class="state-message">Case "${esc(caseId)}" not found. <a href="queue.html">← Return to queue</a></p>`;
+    return;
+  }
+
+  // Header meta
+  const meta = document.getElementById("header-meta");
+  meta.innerHTML = `
+    <span>${esc(caseId)}</span>
+    <span>${data.patient.age}y ${data.patient.sex}</span>
+    <span>${esc(data.imaging_request.modality)} · ${esc(data.imaging_request.body_region)}${data.imaging_request.with_contrast ? " + contrast" : ""}</span>
+  `;
+
+  // Panels
+  const panelsHTML = `
+    <div class="panels">
+      ${renderAIBrief(data.reasoning_brief)}
+      ${renderPolicyMap(data.policy_map)}
+      ${renderContext(data.context)}
+    </div>
+  `;
+
+  // Action bar
+  const actionBarHTML = `
+    <div class="action-bar">
+      <p class="action-bar-label">Nurse Rationale <span style="color:#ef4444">*</span></p>
+      <textarea id="rationale" placeholder="Document your clinical rationale before taking action…"></textarea>
+      <div class="action-buttons">
+        <button id="btn-approve"  class="btn btn-approve"  disabled>Approve</button>
+        <button id="btn-escalate" class="btn btn-escalate" disabled>Escalate to Physician</button>
+        <button id="btn-pend"     class="btn btn-pend"     disabled>Pend</button>
+      </div>
+      <div id="action-feedback"></div>
+    </div>
+  `;
+
+  main.innerHTML = panelsHTML + actionBarHTML;
+
+  // Rationale → enable/disable buttons
+  document.getElementById("rationale").addEventListener("input", function () {
+    setButtons(this.value.trim().length > 0);
+  });
+
+  // Button click handlers
+  document.getElementById("btn-approve").addEventListener("click",  () => submitDecision(caseId, "approve"));
+  document.getElementById("btn-escalate").addEventListener("click", () => submitDecision(caseId, "escalate"));
+  document.getElementById("btn-pend").addEventListener("click",     () => submitDecision(caseId, "pend"));
+}
+
+init();
+</script>
+
+</body>
+</html>

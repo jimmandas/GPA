@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "reasoning_brief",
+  "type": "object",
+  "required": ["case_id", "supporting_evidence", "uncertainty_flags", "nurse_focal_points", "ai_rationale"],
+  "additionalProperties": false,
+  "properties": {
+    "case_id": { "type": "string", "minLength": 1 },
+    "supporting_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "source_ref", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "claim": { "type": "string", "minLength": 1 },
+          "source_ref": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["diagnosis", "imaging", "authorization", "medication", "policy"]
+          }
+        }
+      }
+    },
+    "uncertainty_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue", "source_ref", "resolution_hint"],
+        "additionalProperties": false,
+        "properties": {
+          "issue": { "type": "string", "minLength": 1 },
+          "source_ref": { "type": "string", "minLength": 1 },
+          "resolution_hint": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "nurse_focal_points": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["point", "why"],
+        "additionalProperties": false,
+        "properties": {
+          "point": { "type": "string", "minLength": 1 },
+          "why": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "ai_rationale": { "type": "string", "minLength": 1 }
+  }
+}

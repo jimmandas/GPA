@@ -1,0 +1,22 @@
+{
+  "case_id": "case_0001",
+  "submitted_at": "2026-05-25T14:02:11Z",
+  "patient": {
+    "patient_id": "pt_anon_0001",
+    "age": 62,
+    "sex": "F"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Follow-up of biopsy-proven stage II NSCLC, 3 months post-resection, surveillance per NCCN."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.10",
+    "diagnosis_text": "Malignant neoplasm of upper lobe, right lung",
+    "prior_imaging": [{"modality": "CT", "date": "2026-02-15"}],
+    "supporting_notes": "Post-resection surveillance. Oncologist recommendation enclosed."
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "context",
+  "type": "object",
+  "required": ["case_id", "patient_id", "prior_authorizations", "imaging_history", "relevant_diagnoses", "medications", "data_source"],
+  "additionalProperties": false,
+  "properties": {
+    "case_id": { "type": "string", "minLength": 1 },
+    "patient_id": { "type": "string", "minLength": 1 },
+    "prior_authorizations": { "type": "array", "items": { "type": "object" } },
+    "imaging_history": { "type": "array", "items": { "type": "object" } },
+    "relevant_diagnoses": { "type": "array", "items": { "type": "object" } },
+    "medications": { "type": "array", "items": { "type": "object" } },
+    "data_source": { "type": "string", "enum": ["fixture"] }
+  }
+}
