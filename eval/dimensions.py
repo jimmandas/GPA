@@ -2,13 +2,14 @@
 GPA v4 Eval Dimensions — eval/dimensions.py
 
 Defines the 8 eval dimensions as a dataclass + scoring functions.
-All scoring functions are pure Python, no LLM calls.
-Two dimensions (rationale_faithfulness, decision_reproducibility) are deferred
-and return score=None.
+Six are pure Python. Two require live signal:
+- rationale_faithfulness: LLM-as-judge (Claude), see eval/rationale_judge.py
+- decision_reproducibility: needs N>=2 live runs of the same case
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 
 from gates.source_verification import ALLOWED_SOURCE_REFS
@@ -236,33 +237,96 @@ def score_overall_signal_match(
 # 7. Rationale Faithfulness (deferred)
 # ---------------------------------------------------------------------------
 
-def score_rationale_faithfulness() -> DimensionScore:
+def score_rationale_faithfulness(
+    reasoning_brief: dict | None,
+    submission: dict | None,
+    context: dict | None,
+    policy_map: dict | None,
+) -> DimensionScore:
     """
-    Deferred — requires LLM-as-judge (GPT-4).
-    Returns score=None, passed=None.
+    LLM-as-judge: score = supported_claims / total_claims in
+    reasoning_brief.supporting_evidence. Empty claim list → score 1.0
+    (nothing to confabulate). Judge errors → score None, passed None.
+    Target: >=0.80
     """
+    if reasoning_brief is None or not reasoning_brief.get("supporting_evidence"):
+        return DimensionScore(
+            dimension="rationale_faithfulness",
+            score=1.0,
+            target=">=0.80",
+            passed=True,
+            notes="No supporting_evidence claims to judge (vacuously faithful).",
+        )
+
+    from eval.rationale_judge import judge_rationale_faithfulness
+
+    result = judge_rationale_faithfulness(
+        reasoning_brief, submission or {}, context or {}, policy_map or {}
+    )
+    if result.get("error"):
+        return DimensionScore(
+            dimension="rationale_faithfulness",
+            score=None,
+            target=">=0.80",
+            passed=None,
+            notes=f"Judge failed: {result['error']}",
+        )
+
+    total = result["total"]
+    supported = result["supported"]
+    if total == 0:
+        return DimensionScore(
+            dimension="rationale_faithfulness",
+            score=None,
+            target=">=0.80",
+            passed=None,
+            notes="Judge returned 0 judgments despite non-empty claim list.",
+        )
+
+    score = supported / total
     return DimensionScore(
         dimension="rationale_faithfulness",
-        score=None,
+        score=score,
         target=">=0.80",
-        passed=None,
-        notes="Requires LLM-as-judge (GPT-4). Not computed in MVP unit mode.",
+        passed=score >= 0.80,
+        notes=f"{supported}/{total} claims judged supported.",
     )
 
 
 # ---------------------------------------------------------------------------
-# 8. Decision Reproducibility (deferred)
+# 8. Decision Reproducibility
 # ---------------------------------------------------------------------------
 
-def score_decision_reproducibility() -> DimensionScore:
+def score_decision_reproducibility(
+    overall_signals: list[str | None],
+) -> DimensionScore:
     """
-    Deferred — requires 5 live runs.
-    Returns score=None, passed=None.
+    Score = (count of runs whose overall_signal == modal value) / (total runs).
+    Failed pipeline runs (None) count as their own bucket — a transient failure
+    is a real reproducibility hit.
+    Target: >=0.80
     """
+    n = len(overall_signals)
+    if n == 0:
+        return DimensionScore(
+            dimension="decision_reproducibility",
+            score=None,
+            target=">=0.80",
+            passed=None,
+            notes="No runs provided.",
+        )
+
+    counts = Counter(overall_signals)
+    modal_value, modal_count = counts.most_common(1)[0]
+    score = modal_count / n
+
+    bucket_summary = ", ".join(
+        f"{v!r}×{c}" for v, c in counts.most_common()
+    )
     return DimensionScore(
         dimension="decision_reproducibility",
-        score=None,
+        score=score,
         target=">=0.80",
-        passed=None,
-        notes="Requires 5 live runs. Run with SKIP_INTEGRATION_TESTS unset.",
+        passed=score >= 0.80,
+        notes=f"{modal_count}/{n} runs returned modal {modal_value!r}; buckets: {bucket_summary}",
     )

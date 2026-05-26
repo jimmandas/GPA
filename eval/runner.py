@@ -145,11 +145,14 @@ def _run_unit_case(case_id: str, ground_truth: dict) -> EvalCase:
     scores = _score_all(
         reasoning_brief=reasoning_brief,
         policy_map=policy_map,
+        submission={},
+        context={},
         gate_events=gate_events,
         agent_outputs=agent_outputs,
         agent_names=agent_names,
         schemas_valid=schemas_valid,
         ground_truth=ground_truth,
+        overall_signals=None,
     )
 
     overall_pass = _compute_overall_pass(scores)
@@ -162,8 +165,11 @@ def _run_unit_case(case_id: str, ground_truth: dict) -> EvalCase:
     )
 
 
+REPRODUCIBILITY_RUNS = 5
+
+
 def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
-    """Run the full pipeline and score all dimensions."""
+    """Run the pipeline N times (for reproducibility) and score all dimensions."""
     from orchestrator.pipeline import run_pipeline
 
     fixtures_dir = (
@@ -173,38 +179,45 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
     submission_path = fixtures_dir / f"{case_id}.json"
     submission = json.loads(submission_path.read_text(encoding="utf-8"))
 
-    pipeline_result = run_pipeline(submission)
+    pipeline_results = [run_pipeline(submission) for _ in range(REPRODUCIBILITY_RUNS)]
 
-    # Extract data from pipeline result
-    if pipeline_result.determination:
-        reasoning_brief = pipeline_result.determination.get("reasoning_brief", {})
-        policy_map = pipeline_result.determination.get("policy_map", {})
-        context = pipeline_result.determination.get("context", {})
-        # Collect agent outputs for AI-decision-limit scoring
-        agent_outputs = [
-            pipeline_result.determination.get("findings", {}),
-            context,
-            policy_map,
-            reasoning_brief,
-        ]
+    overall_signals: list[str | None] = []
+    for pr in pipeline_results:
+        pm = (pr.determination or {}).get("policy_map", {}) if pr.determination else {}
+        overall_signals.append(pm.get("overall_signal") if isinstance(pm, dict) else None)
+
+    # Use the first successful run for per-case dimensions; if none succeeded,
+    # fall back to the first run so failure-mode dimensions still score correctly.
+    primary = next(
+        (pr for pr in pipeline_results if pr.determination),
+        pipeline_results[0],
+    )
+
+    if primary.determination:
+        reasoning_brief = primary.determination.get("reasoning_brief", {})
+        policy_map = primary.determination.get("policy_map", {})
+        context = primary.determination.get("context", {})
+        findings = primary.determination.get("findings", {})
+        agent_outputs = [findings or {}, context, policy_map, reasoning_brief]
         agent_names = [
             "evidence_summarizer",
             "context_retriever",
             "policy_mapper",
             "reasoning_drafter",
         ]
-        # Schema validation — check each output is a dict
         schemas_valid = [isinstance(o, dict) for o in agent_outputs]
     else:
         reasoning_brief = {}
         policy_map = {}
+        context = {}
+        findings = {}
         agent_outputs = []
         agent_names = []
         schemas_valid = []
 
     gate_events = [
         {"gate": "admission", "fired": True},
-        {"gate": "source_verification", "fired": pipeline_result.status != "escalated"},
+        {"gate": "source_verification", "fired": primary.status != "escalated"},
         {"gate": "ai_decision_limit", "fired": True},
         {"gate": "denial", "fired": True},
     ]
@@ -212,18 +225,21 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
     scores = _score_all(
         reasoning_brief=reasoning_brief,
         policy_map=policy_map,
+        submission=submission,
+        context=context,
         gate_events=gate_events,
         agent_outputs=agent_outputs,
         agent_names=agent_names,
         schemas_valid=schemas_valid,
         ground_truth=ground_truth,
+        overall_signals=overall_signals,
     )
 
     overall_pass = _compute_overall_pass(scores)
     return EvalCase(
         case_id=case_id,
         ground_truth=ground_truth,
-        pipeline_result=pipeline_result,
+        pipeline_result=primary,
         dimension_scores=scores,
         overall_pass=overall_pass,
     )
@@ -232,11 +248,14 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
 def _score_all(
     reasoning_brief: dict,
     policy_map: dict,
+    submission: dict,
+    context: dict,
     gate_events: list[dict],
     agent_outputs: list[dict],
     agent_names: list[str],
     schemas_valid: list[bool],
     ground_truth: dict,
+    overall_signals: list[str | None] | None = None,
 ) -> list[DimensionScore]:
     return [
         score_source_citation_accuracy(reasoning_brief),
@@ -245,9 +264,23 @@ def _score_all(
         score_schema_compliance(agent_outputs, schemas_valid),
         score_uncertainty_flag_coverage(reasoning_brief, ground_truth),
         score_overall_signal_match(policy_map, ground_truth),
-        score_rationale_faithfulness(),
-        score_decision_reproducibility(),
+        score_rationale_faithfulness(reasoning_brief, submission, context, policy_map)
+            if overall_signals is not None
+            else _deferred("rationale_faithfulness", ">=0.80"),
+        score_decision_reproducibility(overall_signals)
+            if overall_signals is not None
+            else _deferred("decision_reproducibility", ">=0.80"),
     ]
+
+
+def _deferred(name: str, target: str) -> DimensionScore:
+    return DimensionScore(
+        dimension=name,
+        score=None,
+        target=target,
+        passed=None,
+        notes="Not computed in unit mode.",
+    )
 
 
 def _compute_overall_pass(scores: list[DimensionScore]) -> bool:
@@ -303,10 +336,11 @@ def print_report(eval_cases: list[EvalCase]) -> None:
             print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} |")
         print()
 
-    print("## Dimensions Deferred to Integration Mode")
-    print("- Rationale Faithfulness (requires LLM-as-judge)")
-    print("- Decision Reproducibility (requires 5 live runs)")
-    print()
+    if not live:
+        print("## Dimensions Not Scored In Unit Mode")
+        print("- Rationale Faithfulness (requires LLM-as-judge)")
+        print("- Decision Reproducibility (requires 5 live runs)")
+        print()
 
 
 # ---------------------------------------------------------------------------
