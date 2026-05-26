@@ -1,0 +1,22 @@
+{
+  "case_id": "case_0004",
+  "submitted_at": "2026-05-25T13:20:00Z",
+  "patient": {
+    "patient_id": "pt_anon_0004",
+    "age": 66,
+    "sex": "F"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Surveillance CT chest following right upper lobectomy for stage IB NSCLC. Patient overdue for routine follow-up imaging."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.11",
+    "diagnosis_text": "Malignant neoplasm of upper lobe, right bronchus",
+    "prior_imaging": [{"modality": "CT", "date": "2025-09-12"}],
+    "supporting_notes": "Pathologic staging pT2aN0M0, Stage IB. Patient missed scheduled 3-month and 6-month surveillance appointments. Now presenting at 8 months post-resection. On osimertinib for EGFR L858R mutation."
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

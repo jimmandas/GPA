@@ -1,0 +1,22 @@
+{
+  "case_id": "case_0013",
+  "submitted_at": "2026-05-26T15:55:00Z",
+  "patient": {
+    "patient_id": "pt_anon_0010",
+    "age": 64,
+    "sex": "F"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Indeterminate findings on routine surveillance CT — increasing 1.2cm pleural-based opacity in contralateral lung 14 months post-resection. Differential includes second primary vs metastasis vs benign inflammatory process. Considering PET/CT in conjunction."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.11",
+    "diagnosis_text": "Malignant neoplasm of upper lobe, right bronchus",
+    "prior_imaging": [{"modality": "CT", "date": "2026-03-25"}],
+    "supporting_notes": "Pathologic staging pT2aN0M0, Stage IB right upper lobe NSCLC. Lobectomy 2025-03-10. No adjuvant indicated for Stage IB. Routine surveillance CT 2026-03-25 showed new contralateral left upper lobe 0.8cm opacity. Repeat CT 2 months later shows interval growth to 1.2cm. PET/CT now being considered to characterize. Submission asks: is this within routine surveillance scope or is this diagnostic workup of new finding?"
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

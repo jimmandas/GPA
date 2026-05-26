@@ -70,6 +70,15 @@ VALID_CONTEXT = {
             "status": "active",
         }
     ],
+    "medications": [
+        {
+            "name": "osimertinib",
+            "rxnorm_code": "1721560",
+            "start_date": "2026-03-01",
+            "status": "active",
+            "indication": "adjuvant therapy for EGFR-mutated NSCLC",
+        }
+    ],
     "data_source": "fixture",
 }
 

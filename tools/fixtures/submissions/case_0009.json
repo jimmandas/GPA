@@ -1,0 +1,22 @@
+{
+  "case_id": "case_0009",
+  "submitted_at": "2026-05-26T14:18:00Z",
+  "patient": {
+    "patient_id": "pt_anon_0006",
+    "age": 68,
+    "sex": "F"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Surveillance CT chest 9 months post-completion of chemoradiation for unresectable stage IIIA NSCLC, currently on durvalumab maintenance therapy."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.10",
+    "diagnosis_text": "Malignant neoplasm of upper lobe, right lung",
+    "prior_imaging": [{"modality": "CT", "date": "2026-02-20"}],
+    "supporting_notes": "Pathologic staging T3N2M0, Stage IIIA confirmed by mediastinoscopy 2025-06. Completed concurrent chemoradiation 2025-09. Started durvalumab maintenance 2025-10, ongoing. Surveillance imaging continuing per PACIFIC protocol."
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

@@ -1,0 +1,59 @@
+{
+  "patient_id": "pt_anon_0009",
+  "age": 75,
+  "sex": "M",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2025_2511",
+      "date": "2025-12-10",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Post-resection surveillance, stage IIB NSCLC right lower lobe"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.31",
+      "text": "Malignant neoplasm of lower lobe, right bronchus",
+      "date": "2025-09-30",
+      "status": "active",
+      "staging_note": "Pathologic staging pT2bN1M0, Stage IIB"
+    },
+    {
+      "code": "J44.9",
+      "text": "Chronic obstructive pulmonary disease, unspecified",
+      "date": "2022-03-15",
+      "status": "active"
+    },
+    {
+      "code": "N18.30",
+      "text": "Chronic kidney disease, stage 3, unspecified",
+      "date": "2024-11-08",
+      "status": "active"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Carboplatin",
+      "dose": "AUC 4 every 21 days",
+      "start_date": "2025-12-15",
+      "end_date": "2026-03-08",
+      "indication": "Adjuvant chemotherapy post-lobectomy (dose-reduced for renal function)"
+    },
+    {
+      "name": "Pemetrexed",
+      "dose": "500 mg/m2 every 21 days",
+      "start_date": "2025-12-15",
+      "end_date": "2026-03-08",
+      "indication": "Adjuvant chemotherapy post-lobectomy"
+    },
+    {
+      "name": "Apixaban",
+      "dose": "5 mg twice daily",
+      "start_date": "2023-04-10",
+      "indication": "Atrial fibrillation"
+    }
+  ]
+}

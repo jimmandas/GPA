@@ -1,0 +1,24 @@
+{
+  "patient_id": "pt_anon_0004",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2025_2745",
+      "date": "2025-09-12",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Status post right upper lobectomy. Postsurgical changes; no recurrence. No suspicious nodules elsewhere.",
+      "ordering_indication": "Initial post-resection surveillance"
+    },
+    {
+      "study_id": "img_2025_1880",
+      "date": "2025-06-28",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "2.5cm right upper lobe nodule with spiculated margins. Consistent with primary NSCLC. No nodal involvement or distant metastasis.",
+      "ordering_indication": "Pre-surgical staging"
+    }
+  ]
+}

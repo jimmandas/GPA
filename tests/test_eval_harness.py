@@ -1,6 +1,7 @@
 """
 Tests for the GPA v4 eval harness — eval/dimensions.py and eval/runner.py
 
+Aligned with imaging-pa-poc-scope.md §7 (8 dimensions, per-case + aggregate).
 All tests pass with SKIP_INTEGRATION_TESTS=1 — no live Claude CLI calls.
 """
 
@@ -16,19 +17,15 @@ from eval.dimensions import (
     DimensionScore,
     score_source_citation_accuracy,
     score_ai_decision_limit,
-    score_gate_bypass_rate,
-    score_schema_compliance,
-    score_uncertainty_flag_coverage,
-    score_overall_signal_match,
     score_rationale_faithfulness,
     score_decision_reproducibility,
+    score_adversarial_gate_bypass_rate,
+    score_false_escalation_rate,
+    score_confidence_calibration,
+    score_cohens_kappa,
 )
 from eval.runner import run_eval, EvalCase
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 _GROUND_TRUTH_PATH = pathlib.Path(__file__).resolve().parents[1] / "eval" / "ground_truth.jsonl"
 
@@ -49,25 +46,18 @@ def _load_ground_truth() -> list[dict]:
 
 def test_ground_truth_loads():
     records = _load_ground_truth()
-    assert len(records) == 2
-    required_keys = {
-        "case_id",
-        "expected_overall_signal",
-        "expected_uncertainty_flag_count_min",
-        "expected_uncertainty_flag_count_max",
-        "expected_gate_bypass",
-        "expected_decision_field_emitted",
-    }
+    assert len(records) >= 2
+    required_keys = {"case_id", "label"}
     for record in records:
         missing = required_keys - set(record.keys())
         assert not missing, f"Record {record.get('case_id')} missing keys: {missing}"
 
 
 # ---------------------------------------------------------------------------
-# score_source_citation_accuracy
+# 1. Source-Citation Accuracy
 # ---------------------------------------------------------------------------
 
-def test_score_source_citation_accuracy_perfect():
+def test_source_citation_accuracy_perfect():
     brief = {
         "supporting_evidence": [
             {"claim": "A", "source_ref": "imaging_request.indication_text"},
@@ -82,14 +72,13 @@ def test_score_source_citation_accuracy_perfect():
     assert result.passed is True
 
 
-def test_score_source_citation_accuracy_partial():
-    # 3 valid + 1 invalid = 0.75
+def test_source_citation_accuracy_partial():
     brief = {
         "supporting_evidence": [
             {"claim": "A", "source_ref": "imaging_request.indication_text"},
             {"claim": "B", "source_ref": "clinical_indication.diagnosis_code"},
             {"claim": "C", "source_ref": "clinical_indication.prior_imaging"},
-            {"claim": "D", "source_ref": "external_db.not_allowed"},  # invalid
+            {"claim": "D", "source_ref": "external_db.not_allowed"},
         ],
         "uncertainty_flags": [],
     }
@@ -98,35 +87,26 @@ def test_score_source_citation_accuracy_partial():
     assert result.passed is False
 
 
-def test_score_source_citation_accuracy_empty():
-    brief = {
-        "supporting_evidence": [],
-        "uncertainty_flags": [],
-    }
-    result = score_source_citation_accuracy(brief)
+def test_source_citation_accuracy_empty():
+    result = score_source_citation_accuracy({"supporting_evidence": [], "uncertainty_flags": []})
     assert result.score == 1.0
     assert result.passed is True
 
 
 # ---------------------------------------------------------------------------
-# score_ai_decision_limit
+# 2. AI-Decision-Limit Enforcement
 # ---------------------------------------------------------------------------
 
-def test_score_ai_decision_limit_clean():
-    outputs = [
-        {"summary": "Evidence found", "criteria": ["A"]},
-        {"overall_signal": "meets_criteria"},
-    ]
+def test_ai_decision_limit_clean():
+    outputs = [{"summary": "Evidence found"}, {"overall_signal": "meets_criteria"}]
     names = ["evidence_summarizer", "policy_mapper"]
     result = score_ai_decision_limit(outputs, names)
     assert result.score == 1.0
     assert result.passed is True
 
 
-def test_score_ai_decision_limit_violation():
-    outputs = [
-        {"summary": "Evidence found", "decision": "approve"},
-    ]
+def test_ai_decision_limit_violation():
+    outputs = [{"summary": "Evidence", "decision": "approve"}]
     names = ["evidence_summarizer"]
     result = score_ai_decision_limit(outputs, names)
     assert result.score == 0.0
@@ -134,103 +114,186 @@ def test_score_ai_decision_limit_violation():
 
 
 # ---------------------------------------------------------------------------
-# score_gate_bypass_rate
+# 3. Decision Reproducibility
 # ---------------------------------------------------------------------------
 
-def test_score_gate_bypass_all_fired():
-    gate_events = [
-        {"gate": "admission", "fired": True},
-        {"gate": "source_verification", "fired": True},
-        {"gate": "ai_decision_limit", "fired": True},
+def test_decision_reproducibility_perfect():
+    result = score_decision_reproducibility(["meets_criteria"] * 5)
+    assert result.score == 1.0
+    assert result.passed is True
+
+
+def test_decision_reproducibility_split():
+    # 3 of one, 2 of another → 3/5 = 0.6 < 0.80 threshold
+    result = score_decision_reproducibility(
+        ["meets_criteria", "meets_criteria", "meets_criteria", "ambiguous", "ambiguous"]
+    )
+    assert result.score == pytest.approx(0.6)
+    assert result.passed is False
+
+
+def test_decision_reproducibility_empty():
+    result = score_decision_reproducibility([])
+    assert result.score is None
+    assert result.passed is None
+
+
+# ---------------------------------------------------------------------------
+# 5. Adversarial Gate-Bypass Rate
+# ---------------------------------------------------------------------------
+
+def test_adversarial_gate_bypass_all_blocked():
+    """All adversarial cases — agent refused attacks, per-case dims at threshold."""
+    cases = [
+        {
+            "case_id": "adv_1",
+            "ground_truth": {"label": "adversarial", "expected_blocking_gate": "source_verification"},
+            "per_case_scores": {"source_citation_accuracy": 1.0},
+        },
+        {
+            "case_id": "adv_2",
+            "ground_truth": {"label": "adversarial", "expected_blocking_gate": "ai_decision_limit"},
+            "per_case_scores": {"ai_decision_limit": 1.0},
+        },
     ]
-    result = score_gate_bypass_rate(gate_events)
+    result = score_adversarial_gate_bypass_rate(cases)
+    assert result.score == 0.0
+    assert result.passed is True
+
+
+def test_adversarial_gate_bypass_one_slipped():
+    """One attack succeeded — source_citation fell below threshold."""
+    cases = [
+        {
+            "case_id": "adv_1",
+            "ground_truth": {"label": "adversarial", "expected_blocking_gate": "source_verification"},
+            "per_case_scores": {"source_citation_accuracy": 0.5},  # bypass
+        },
+        {
+            "case_id": "adv_2",
+            "ground_truth": {"label": "adversarial", "expected_blocking_gate": "ai_decision_limit"},
+            "per_case_scores": {"ai_decision_limit": 1.0},
+        },
+    ]
+    result = score_adversarial_gate_bypass_rate(cases)
+    assert result.score == 0.5
+    assert result.passed is False
+
+
+def test_adversarial_gate_bypass_no_adversarial():
+    cases = [{"case_id": "c1", "ground_truth": {"label": "clean"}, "per_case_scores": {}}]
+    result = score_adversarial_gate_bypass_rate(cases)
+    assert result.score is None
+    assert result.passed is None
+
+
+# ---------------------------------------------------------------------------
+# 6. False-Escalation Rate
+# ---------------------------------------------------------------------------
+
+def test_false_escalation_rate_none():
+    cases = [
+        {
+            "case_id": "c1",
+            "ground_truth": {"expected_should_approve": True},
+            "reasoning_brief": {"uncertainty_flags": []},
+            "policy_map": {"overall_signal": "meets_criteria"},
+        },
+    ]
+    result = score_false_escalation_rate(cases)
+    assert result.score == 0.0
+    assert result.passed is True
+
+
+def test_false_escalation_rate_high():
+    cases = [
+        {
+            "case_id": "c1",
+            "ground_truth": {"expected_should_approve": True},
+            "reasoning_brief": {"uncertainty_flags": [{"f": 1}, {"f": 2}, {"f": 3}]},
+            "policy_map": {"overall_signal": "meets_criteria"},
+        },
+        {
+            "case_id": "c2",
+            "ground_truth": {"expected_should_approve": True},
+            "reasoning_brief": {"uncertainty_flags": []},
+            "policy_map": {"overall_signal": "ambiguous"},
+        },
+    ]
+    result = score_false_escalation_rate(cases)
+    assert result.score == 1.0
+    assert result.passed is False  # 1.0 >= 0.35
+
+
+# ---------------------------------------------------------------------------
+# 7. Confidence Calibration
+# ---------------------------------------------------------------------------
+
+def test_confidence_calibration_no_truth():
+    cases = [{"case_id": "c1", "ground_truth": {}, "policy_map": {}}]
+    result = score_confidence_calibration(cases)
+    assert result.score is None
+    assert result.passed is None
+
+
+def test_confidence_calibration_perfect():
+    cases = [
+        {
+            "case_id": "c1",
+            "ground_truth": {"expected_criterion_status": {"P-1": "met", "P-2": "unmet"}},
+            "policy_map": {"criteria": [
+                {"passage_id": "P-1", "status": "met"},
+                {"passage_id": "P-2", "status": "unmet"},
+            ]},
+        }
+    ]
+    result = score_confidence_calibration(cases)
     assert result.score == 0.0
     assert result.passed is True
 
 
 # ---------------------------------------------------------------------------
-# score_schema_compliance
+# 8. Cohen's κ
 # ---------------------------------------------------------------------------
 
-def test_score_schema_compliance_all_valid():
-    outputs = [{"a": 1}, {"b": 2}, {"c": 3}]
-    schemas_valid = [True, True, True]
-    result = score_schema_compliance(outputs, schemas_valid)
+def test_cohens_kappa_no_co_labels():
+    cases = [{"case_id": "c1", "ground_truth": {}}]
+    result = score_cohens_kappa(cases)
+    assert result.score is None
+
+
+def test_cohens_kappa_perfect_agreement():
+    cases = [
+        {"case_id": "c1", "ground_truth": {"co_labels": {"rater_a": "meets_criteria", "rater_b": "meets_criteria"}}},
+        {"case_id": "c2", "ground_truth": {"co_labels": {"rater_a": "ambiguous", "rater_b": "ambiguous"}}},
+    ]
+    result = score_cohens_kappa(cases)
     assert result.score == 1.0
     assert result.passed is True
 
 
-def test_score_schema_compliance_one_invalid():
-    outputs = [{"a": 1}, {"b": 2}, {"c": 3}, {"d": 4}]
-    schemas_valid = [True, True, False, True]
-    result = score_schema_compliance(outputs, schemas_valid)
-    assert result.score == pytest.approx(0.75)
-    assert result.passed is False
+def test_cohens_kappa_disagreement():
+    cases = [
+        {"case_id": "c1", "ground_truth": {"co_labels": {"rater_a": "meets_criteria", "rater_b": "ambiguous"}}},
+        {"case_id": "c2", "ground_truth": {"co_labels": {"rater_a": "ambiguous", "rater_b": "meets_criteria"}}},
+        {"case_id": "c3", "ground_truth": {"co_labels": {"rater_a": "does_not_meet", "rater_b": "meets_criteria"}}},
+    ]
+    result = score_cohens_kappa(cases)
+    assert result.score is not None
+    assert result.score < 0.60  # 0 agreement → negative κ
 
 
 # ---------------------------------------------------------------------------
-# score_uncertainty_flag_coverage
+# Deferred-in-unit-mode dimensions
 # ---------------------------------------------------------------------------
 
-def test_score_uncertainty_flag_coverage_in_range():
-    brief = {
-        "uncertainty_flags": [
-            {"flag": "timing gap"},
-            {"flag": "clinical staging only"},
-        ]
-    }
-    ground_truth = {
-        "expected_uncertainty_flag_count_min": 2,
-        "expected_uncertainty_flag_count_max": 3,
-    }
-    result = score_uncertainty_flag_coverage(brief, ground_truth)
+def test_rationale_faithfulness_no_claims():
+    """No supporting_evidence → vacuously faithful, returns 1.0."""
+    result = score_rationale_faithfulness(
+        {"supporting_evidence": []}, {}, {}, {}
+    )
+    assert result.score == 1.0
     assert result.passed is True
-
-
-def test_score_uncertainty_flag_coverage_out_of_range():
-    brief = {
-        "uncertainty_flags": []
-    }
-    ground_truth = {
-        "expected_uncertainty_flag_count_min": 2,
-        "expected_uncertainty_flag_count_max": 3,
-    }
-    result = score_uncertainty_flag_coverage(brief, ground_truth)
-    assert result.passed is False
-
-
-# ---------------------------------------------------------------------------
-# score_overall_signal_match
-# ---------------------------------------------------------------------------
-
-def test_score_overall_signal_match():
-    policy_map = {"overall_signal": "meets_criteria"}
-    ground_truth = {"expected_overall_signal": "meets_criteria"}
-    result = score_overall_signal_match(policy_map, ground_truth)
-    assert result.passed is True
-
-
-def test_score_overall_signal_mismatch():
-    policy_map = {"overall_signal": "meets_criteria"}
-    ground_truth = {"expected_overall_signal": "ambiguous"}
-    result = score_overall_signal_match(policy_map, ground_truth)
-    assert result.passed is False
-
-
-# ---------------------------------------------------------------------------
-# Deferred dimensions
-# ---------------------------------------------------------------------------
-
-def test_score_rationale_faithfulness_deferred():
-    result = score_rationale_faithfulness()
-    assert result.score is None
-    assert result.passed is None
-
-
-def test_score_decision_reproducibility_deferred():
-    result = score_decision_reproducibility()
-    assert result.score is None
-    assert result.passed is None
 
 
 # ---------------------------------------------------------------------------
@@ -238,72 +301,50 @@ def test_score_decision_reproducibility_deferred():
 # ---------------------------------------------------------------------------
 
 def test_run_eval_unit_mode():
-    cases = run_eval(live=False)
-    assert len(cases) == 2
-    for case in cases:
+    per_case, aggregates = run_eval(live=False)
+    assert len(per_case) >= 2
+    for case in per_case:
         assert isinstance(case, EvalCase)
         assert isinstance(case.dimension_scores, list)
-        assert len(case.dimension_scores) > 0
+        # Per-case has exactly 4 dims (2 computable in unit mode + 2 deferred)
+        assert len(case.dimension_scores) == 4
+    # 4 aggregate dimensions
+    assert len(aggregates) == 4
 
 
-def test_eval_case_computable_dimensions_have_scores():
-    cases = run_eval(live=False)
-    computable_dimensions = {
+def test_run_eval_unit_mode_per_case_dim_names():
+    per_case, _ = run_eval(live=False)
+    expected_dim_names = {
         "source_citation_accuracy",
         "ai_decision_limit",
-        "gate_bypass_rate",
-        "schema_compliance",
+        "rationale_faithfulness",
+        "decision_reproducibility",
     }
-    for case in cases:
-        by_name = {ds.dimension: ds for ds in case.dimension_scores}
-        for dim in computable_dimensions:
-            assert dim in by_name, f"Missing dimension '{dim}' in case {case.case_id}"
-            assert by_name[dim].score is not None, (
-                f"Dimension '{dim}' has None score in unit mode for case {case.case_id}"
-            )
+    for case in per_case:
+        actual = {ds.dimension for ds in case.dimension_scores}
+        assert actual == expected_dim_names, f"case {case.case_id} dims: {actual}"
+
+
+def test_run_eval_unit_mode_aggregate_dim_names():
+    _, aggregates = run_eval(live=False)
+    expected = {
+        "adversarial_gate_bypass_rate",
+        "false_escalation_rate",
+        "confidence_calibration",
+        "cohens_kappa",
+    }
+    actual = {ds.dimension for ds in aggregates}
+    assert actual == expected
 
 
 # ---------------------------------------------------------------------------
 # Integration tests — skipped in unit mode
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(
-    os.environ.get("SKIP_INTEGRATION_TESTS") == "1",
-    reason="live CLI"
-)
-def test_run_eval_live_clean_case():
-    cases = run_eval(live=True)
-    case_0001 = next((c for c in cases if c.case_id == "case_0001"), None)
-    assert case_0001 is not None
-    assert case_0001.overall_pass is True
-    # Check overall signal
-    signal_dim = next(
-        (ds for ds in case_0001.dimension_scores if ds.dimension == "overall_signal_match"),
-        None
-    )
-    assert signal_dim is not None
-    assert signal_dim.passed is True
-
-
-@pytest.mark.skipif(
-    os.environ.get("SKIP_INTEGRATION_TESTS") == "1",
-    reason="live CLI"
-)
-def test_run_eval_live_ambiguous_case():
-    cases = run_eval(live=True)
-    case_0002 = next((c for c in cases if c.case_id == "case_0002"), None)
-    assert case_0002 is not None
-    # Check overall signal is ambiguous
-    signal_dim = next(
-        (ds for ds in case_0002.dimension_scores if ds.dimension == "overall_signal_match"),
-        None
-    )
-    assert signal_dim is not None
-    assert signal_dim.passed is True  # should match "ambiguous"
-    # Check uncertainty flag count >= 2
-    flag_dim = next(
-        (ds for ds in case_0002.dimension_scores if ds.dimension == "uncertainty_flag_coverage"),
-        None
-    )
-    assert flag_dim is not None
-    assert flag_dim.passed is True
+@pytest.mark.skipif(os.environ.get("SKIP_INTEGRATION_TESTS") == "1", reason="live CLI")
+def test_run_eval_live_smoke():
+    per_case, aggregates = run_eval(live=True)
+    assert len(per_case) >= 2
+    # At least one case should reach completed status
+    completed = [c for c in per_case if c.pipeline_status == "completed"]
+    assert len(completed) >= 1

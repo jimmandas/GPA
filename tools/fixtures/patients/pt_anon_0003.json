@@ -1,0 +1,41 @@
+{
+  "patient_id": "pt_anon_0003",
+  "age": 71,
+  "sex": "M",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2025_2188",
+      "date": "2025-12-01",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Post-resection surveillance, stage IIB NSCLC right lower lobe"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.31",
+      "text": "Malignant neoplasm of lower lobe, right bronchus",
+      "date": "2025-08-10",
+      "status": "active",
+      "staging_note": "Pathologic staging pT3N1M0, Stage IIB"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Carboplatin",
+      "dose": "AUC 5 every 21 days",
+      "start_date": "2025-10-15",
+      "end_date": "2026-02-04",
+      "indication": "Adjuvant chemotherapy post-lobectomy"
+    },
+    {
+      "name": "Pemetrexed",
+      "dose": "500mg/m2 every 21 days",
+      "start_date": "2025-10-15",
+      "end_date": "2026-02-04",
+      "indication": "Adjuvant chemotherapy post-lobectomy"
+    }
+  ]
+}

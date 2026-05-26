@@ -1,0 +1,39 @@
+{
+  "patient_id": "pt_anon_0007",
+  "age": 57,
+  "sex": "M",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2026_0095",
+      "date": "2026-01-02",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Post-resection surveillance, stage IIA NSCLC left upper lobe"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.12",
+      "text": "Malignant neoplasm of upper lobe, left bronchus",
+      "date": "2025-10-18",
+      "status": "active",
+      "staging_note": "Pathologic staging pT2bN1M0, Stage IIA"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Carboplatin",
+      "dose": "AUC 5 every 21 days",
+      "start_date": "2026-01-20",
+      "indication": "Adjuvant chemotherapy post-lobectomy"
+    },
+    {
+      "name": "Paclitaxel",
+      "dose": "175 mg/m2 every 21 days",
+      "start_date": "2026-01-20",
+      "indication": "Adjuvant chemotherapy post-lobectomy"
+    }
+  ]
+}

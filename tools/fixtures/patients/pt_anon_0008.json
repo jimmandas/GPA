@@ -1,0 +1,26 @@
+{
+  "patient_id": "pt_anon_0008",
+  "age": 73,
+  "sex": "F",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2026_0244",
+      "date": "2026-01-28",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Initial post-resection surveillance, stage IA NSCLC right lower lobe"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.30",
+      "text": "Malignant neoplasm of lower lobe, unspecified bronchus",
+      "date": "2025-12-04",
+      "status": "active",
+      "staging_note": "Pathologic staging pT1aN0M0, Stage IA. Adjuvant therapy not indicated."
+    }
+  ],
+  "medications": []
+}

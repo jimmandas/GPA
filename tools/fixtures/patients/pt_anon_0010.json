@@ -1,0 +1,35 @@
+{
+  "patient_id": "pt_anon_0010",
+  "age": 64,
+  "sex": "F",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2026_0511",
+      "date": "2026-03-18",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Post-resection surveillance, stage IB NSCLC right upper lobe"
+    },
+    {
+      "auth_id": "auth_2025_2098",
+      "date": "2025-10-04",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Post-resection surveillance, stage IB NSCLC right upper lobe"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.11",
+      "text": "Malignant neoplasm of upper lobe, right bronchus",
+      "date": "2025-02-14",
+      "status": "active",
+      "staging_note": "Pathologic staging pT2aN0M0, Stage IB. Adjuvant therapy not indicated."
+    }
+  ],
+  "medications": []
+}

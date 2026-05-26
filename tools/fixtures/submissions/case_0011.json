@@ -1,0 +1,22 @@
+{
+  "case_id": "case_0011",
+  "submitted_at": "2026-05-26T15:08:00Z",
+  "patient": {
+    "patient_id": "pt_anon_0008",
+    "age": 73,
+    "sex": "F"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Surveillance CT chest 4 months post-segmentectomy for stage IA NSCLC. Adjuvant therapy not indicated per stage."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.30",
+    "diagnosis_text": "Malignant neoplasm of lower lobe, unspecified bronchus",
+    "prior_imaging": [{"modality": "CT", "date": "2026-02-04"}],
+    "supporting_notes": "Pathologic staging pT1aN0M0, Stage IA. Wedge resection performed 2026-01-15 due to limited pulmonary reserve. No adjuvant therapy indicated for Stage IA per NCCN. SURV-3 criterion (adjuvant therapy documentation) is not applicable to this case."
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

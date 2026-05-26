@@ -1,0 +1,33 @@
+{
+  "patient_id": "pt_anon_0010",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2026_0922",
+      "date": "2026-03-25",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Status post right upper lobectomy. No local recurrence. New 0.8cm pleural-based opacity in left upper lobe — indeterminate; recommend short-interval follow-up.",
+      "ordering_indication": "Routine post-resection surveillance"
+    },
+    {
+      "study_id": "img_2025_2280",
+      "date": "2025-10-12",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Status post right upper lobectomy. No recurrent disease. No suspicious contralateral findings. Normal mediastinum.",
+      "ordering_indication": "Initial post-resection surveillance"
+    },
+    {
+      "study_id": "img_2025_0414",
+      "date": "2025-02-22",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "2.1cm right upper lobe spiculated mass. No nodal involvement or distant metastasis. Consistent with primary NSCLC.",
+      "ordering_indication": "Pre-surgical staging"
+    }
+  ]
+}

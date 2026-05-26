@@ -1,0 +1,24 @@
+{
+  "patient_id": "pt_anon_0005",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2026_1180",
+      "date": "2026-03-30",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Status post right upper lobectomy. No evidence of local recurrence. New 7mm nodule in left upper lobe with indeterminate features. Recommend short-interval follow-up.",
+      "ordering_indication": "Routine post-resection surveillance"
+    },
+    {
+      "study_id": "img_2025_2014",
+      "date": "2025-06-10",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Status post right upper lobectomy. No suspicious nodules. No nodal involvement.",
+      "ordering_indication": "Initial post-resection surveillance"
+    }
+  ]
+}

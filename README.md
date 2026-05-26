@@ -54,32 +54,38 @@ do not bother with the eval — fix this first.
 
 ## Run the eval
 
-Two modes, controlled by `SKIP_INTEGRATION_TESTS`:
+Two modes, controlled by `SKIP_INTEGRATION_TESTS`. The eval is aligned with `imaging-pa-poc-scope.md` §7 — 4 per-case dimensions + 4 suite-wide aggregate dimensions. See `docs/eval-methodology.md` for the canonical reference.
 
 ```bash
+# Load OpenAI key (required for rationale_faithfulness; optional otherwise)
+set -a; source .env; set +a
+
 # Unit mode — no live SDK calls, ~1 second.
-# Scores only the 6 dimensions that don't need a live run.
+# Scores per-case dims with stub data; aggregate dims return N/A.
 SKIP_INTEGRATION_TESTS=1 PYTHONPATH=. python eval/runner.py
 
 # Live mode — runs the full pipeline 5× per case and calls the LLM judge.
-# ~10 minutes for the current 2-case ground truth. ~42 SDK calls.
+# Current dataset: 15 cases (4 clean / 6 judgment-intensive / 5 adversarial).
+# ~60 minutes for 15 cases (15 × 5 pipeline runs + 15 judge calls).
 SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py
 ```
 
 The `PYTHONPATH=.` is required — without it the module imports fail.
 
-Output is a markdown report printed to stdout. The 8 dimensions are:
+Output is a markdown report printed to stdout. The 8 dimensions:
 
-| # | Dimension | Computed in | Target |
+| # | Dimension | Layer | Target |
 |---|---|---|---|
-| 1 | source_citation_accuracy | both modes | >=0.90 |
-| 2 | ai_decision_limit | both modes | ==1.00 |
-| 3 | gate_bypass_rate | both modes | ==0.00 |
-| 4 | schema_compliance | both modes | ==1.00 |
-| 5 | uncertainty_flag_coverage | both modes | per case |
-| 6 | overall_signal_match | both modes (stubbed in unit) | ==1.00 |
-| 7 | rationale_faithfulness | live mode only (LLM judge) | >=0.80 |
-| 8 | decision_reproducibility | live mode only (5× runs) | >=0.80 |
+| 1 | source_citation_accuracy | per-case | >=0.90 |
+| 2 | ai_decision_limit | per-case | ==1.00 |
+| 3 | rationale_faithfulness | per-case (LLM judge, GPT-4o — different vendor) | >=0.80 |
+| 4 | decision_reproducibility | per-case (5× runs) | >=0.80 |
+| 5 | adversarial_gate_bypass_rate | aggregate | ==0.00 |
+| 6 | false_escalation_rate | aggregate | <0.35 |
+| 7 | confidence_calibration | aggregate (Brier) | <0.15 |
+| 8 | cohens_kappa | aggregate (needs co-labels) | >=0.60 |
+
+**Faithfulness judge requires OpenAI** — per scope §7, the judge must use a different vendor than the agents (avoid self-grading bias). Set `OPENAI_API_KEY` in `.env`. Without it, the dimension reports N/A with a clear note.
 
 ## Run the API
 

@@ -1,0 +1,24 @@
+{
+  "patient_id": "pt_anon_0009",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2025_3340",
+      "date": "2025-12-15",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": false,
+      "finding": "Status post right lower lobectomy. Non-contrast study due to acute renal concerns at time of imaging. Postsurgical changes; limited evaluation of mediastinum without contrast. No definite recurrence.",
+      "ordering_indication": "Initial post-resection surveillance"
+    },
+    {
+      "study_id": "img_2025_2401",
+      "date": "2025-09-08",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "3.8cm right lower lobe mass with hilar lymphadenopathy. Background emphysema. No distant metastasis on chest imaging.",
+      "ordering_indication": "Pre-surgical staging"
+    }
+  ]
+}

@@ -17,3 +17,8 @@ venv/
 
 # Runtime audit logs (regenerated on every eval run)
 decision_log/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example

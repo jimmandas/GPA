@@ -1,0 +1,33 @@
+{
+  "patient_id": "pt_anon_0006",
+  "age": 68,
+  "sex": "F",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2026_0218",
+      "date": "2026-02-12",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Surveillance imaging, stage IIIA NSCLC on durvalumab maintenance"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.10",
+      "text": "Malignant neoplasm of upper lobe, right lung",
+      "date": "2025-05-22",
+      "status": "active",
+      "staging_note": "Pathologic staging T3N2M0, Stage IIIA — mediastinoscopy-confirmed"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Durvalumab",
+      "dose": "10 mg/kg every 2 weeks",
+      "start_date": "2025-10-08",
+      "indication": "Consolidation immunotherapy post-chemoradiation per PACIFIC trial protocol"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "case_id": "case_0005",
+  "submitted_at": "2026-05-26T09:08:00Z",
+  "patient": {
+    "patient_id": "pt_anon_0005",
+    "age": 59,
+    "sex": "F"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Repeat CT chest 8 weeks after prior surveillance scan showed new sub-centimeter nodule. Differential includes recurrence vs new primary vs benign granuloma. Pulmonologist requests re-imaging to assess interval change."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.10",
+    "diagnosis_text": "Malignant neoplasm of upper lobe, right lung",
+    "prior_imaging": [{"modality": "CT", "date": "2026-03-30"}],
+    "supporting_notes": "Pathologic staging pT1bN0M0, Stage IA. Adjuvant therapy not indicated per oncology (Stage IA). Prior surveillance CT 2026-03-30 reported a new 7mm left upper lobe nodule with indeterminate features. Requesting follow-up imaging to characterize interval change. Clinical question: surveillance for prior cancer vs diagnostic workup for new finding."
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

@@ -1,0 +1,26 @@
+{
+  "patient_id": "pt_anon_0005",
+  "age": 59,
+  "sex": "F",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2026_0344",
+      "date": "2026-03-22",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Post-resection surveillance, stage IA NSCLC right upper lobe"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.10",
+      "text": "Malignant neoplasm of upper lobe, right lung",
+      "date": "2025-04-30",
+      "status": "active",
+      "staging_note": "Pathologic staging pT1bN0M0, Stage IA. Adjuvant therapy not indicated."
+    }
+  ],
+  "medications": []
+}

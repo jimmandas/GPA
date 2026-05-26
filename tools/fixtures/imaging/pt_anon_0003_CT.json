@@ -1,0 +1,24 @@
+{
+  "patient_id": "pt_anon_0003",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2025_3201",
+      "date": "2025-12-08",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Status post right lower lobectomy. Postsurgical changes without evidence of recurrence. No suspicious nodules. Mediastinum unremarkable.",
+      "ordering_indication": "Initial post-resection surveillance"
+    },
+    {
+      "study_id": "img_2025_2640",
+      "date": "2025-08-22",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "4.1cm right lower lobe spiculated mass with adjacent hilar lymphadenopathy. Findings consistent with biopsy-proven NSCLC. No distant metastasis on chest imaging.",
+      "ordering_indication": "Initial staging workup"
+    }
+  ]
+}

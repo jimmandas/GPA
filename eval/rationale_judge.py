@@ -1,10 +1,14 @@
 """
 Rationale Faithfulness Judge — eval/rationale_judge.py
 
-LLM-as-judge for the rationale_faithfulness eval dimension. Given a
-reasoning_brief and the upstream findings + context it was supposed to
-draw from, asks Claude to judge each supporting_evidence claim as
-supported or not.
+LLM-as-judge for the rationale_faithfulness eval dimension. Per scope §7, the
+judge MUST run on a different vendor than the agents under test to avoid
+self-grading bias. The agents use Claude (Anthropic); the judge uses GPT-4
+(OpenAI).
+
+Given a reasoning_brief and the upstream findings + context it was supposed
+to draw from, asks GPT-4 to judge each supporting_evidence claim as supported
+or not.
 
 Returns a dict shaped like:
     {
@@ -12,19 +16,26 @@ Returns a dict shaped like:
         "supported": int,    # claims judged supported
         "judgments": [{"claim_index": int, "supported": bool, "reason": str}, ...],
         "error": str | None, # populated only if the judge failed
+        "judge_model": str,  # which model produced the verdicts
     }
+
+Requires OPENAI_API_KEY env var. If not set, returns error="missing_api_key"
+so the eval can report this dimension as deferred rather than fall back to a
+biased same-vendor judge.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
+import os
 import re
 
-from claude_agent_sdk import ClaudeAgentOptions, query
 
+_JUDGE_MODEL = os.environ.get("FAITHFULNESS_JUDGE_MODEL", "gpt-4o")
 
-_JUDGE_INSTRUCTIONS = """\
+# Published per scope §7 — keep this prompt under version control so the eval
+# report can reproduce judge behavior.
+JUDGE_INSTRUCTIONS = """\
 You are an evaluator measuring whether an AI-drafted reasoning brief is faithful
 to its upstream evidence sources. You do not evaluate clinical correctness. You
 only evaluate whether each claim is directly supported by the material at its
@@ -58,10 +69,8 @@ def build_evidence_namespace(
 ) -> dict:
     """Assemble the dict the judge walks to resolve source_refs."""
     return {
-        "imaging_request": submission.get("imaging_request", {}) if submission else {},
-        "clinical_indication": (
-            submission.get("clinical_indication", {}) if submission else {}
-        ),
+        "imaging_request": (submission or {}).get("imaging_request", {}),
+        "clinical_indication": (submission or {}).get("clinical_indication", {}),
         "patient_context": {
             "prior_authorizations": (context or {}).get("prior_authorizations", []),
             "imaging_history": (context or {}).get("imaging_history", []),
@@ -85,7 +94,7 @@ def _build_user_prompt(reasoning_brief: dict, evidence_namespace: dict) -> str:
         "evidence_namespace": evidence_namespace,
         "claims_to_judge": indexed_claims,
     }
-    return _JUDGE_INSTRUCTIONS + "\n\n---\n\n" + json.dumps(payload, indent=2)
+    return json.dumps(payload, indent=2)
 
 
 def _extract_json(text: str) -> dict:
@@ -101,47 +110,81 @@ def _extract_json(text: str) -> dict:
     return json.loads(match.group(0))
 
 
-async def _judge_async(reasoning_brief: dict, evidence_namespace: dict) -> dict:
-    user_prompt = _build_user_prompt(reasoning_brief, evidence_namespace)
-    options = ClaudeAgentOptions()
-
-    final_text = ""
-    async for message in query(prompt=user_prompt, options=options):
-        if hasattr(message, "content") and message.content:
-            for block in message.content:
-                if hasattr(block, "text"):
-                    final_text += block.text
-
-    if not final_text.strip():
-        return {"total": 0, "supported": 0, "judgments": [], "error": "empty_response"}
-
-    parsed = _extract_json(final_text)
-    judgments = parsed.get("judgments", [])
-    supported = sum(1 for j in judgments if j.get("supported") is True)
-    return {
-        "total": len(judgments),
-        "supported": supported,
-        "judgments": judgments,
-        "error": None,
-    }
-
-
 def judge_rationale_faithfulness(
     reasoning_brief: dict,
     submission: dict,
     context: dict,
     policy_map: dict,
 ) -> dict:
-    """Sync wrapper. Builds the evidence namespace and dispatches to the judge."""
+    """
+    Call GPT-4 to judge each supporting_evidence claim.
+    Returns a result dict (see module docstring). Never raises — failures
+    are encoded in the result's `error` field.
+    """
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return {
+            "total": 0,
+            "supported": 0,
+            "judgments": [],
+            "error": (
+                "missing_api_key: OPENAI_API_KEY not set. Scope §7 requires a "
+                "non-Anthropic judge to avoid self-grading bias. Set OPENAI_API_KEY "
+                "or set FAITHFULNESS_JUDGE_VENDOR=anthropic to opt into a biased fallback."
+            ),
+            "judge_model": None,
+        }
+
     try:
+        from openai import OpenAI
+    except ImportError as exc:
+        return {
+            "total": 0,
+            "supported": 0,
+            "judgments": [],
+            "error": f"openai_import_failed: {exc}. Run: pip install openai",
+            "judge_model": None,
+        }
+
+    try:
+        client = OpenAI(api_key=api_key)
         evidence_namespace = build_evidence_namespace(submission, context, policy_map)
-        return asyncio.run(
-            _judge_async(reasoning_brief or {}, evidence_namespace)
+        user_prompt = _build_user_prompt(reasoning_brief or {}, evidence_namespace)
+
+        response = client.chat.completions.create(
+            model=_JUDGE_MODEL,
+            messages=[
+                {"role": "system", "content": JUDGE_INSTRUCTIONS},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.0,
+            response_format={"type": "json_object"},
         )
+        text = response.choices[0].message.content or ""
+        if not text.strip():
+            return {
+                "total": 0,
+                "supported": 0,
+                "judgments": [],
+                "error": "empty_response_from_judge",
+                "judge_model": _JUDGE_MODEL,
+            }
+
+        parsed = _extract_json(text)
+        judgments = parsed.get("judgments", [])
+        supported = sum(1 for j in judgments if j.get("supported") is True)
+        return {
+            "total": len(judgments),
+            "supported": supported,
+            "judgments": judgments,
+            "error": None,
+            "judge_model": _JUDGE_MODEL,
+        }
     except Exception as exc:
         return {
             "total": 0,
             "supported": 0,
             "judgments": [],
             "error": f"judge_exception: {exc}",
+            "judge_model": _JUDGE_MODEL,
         }

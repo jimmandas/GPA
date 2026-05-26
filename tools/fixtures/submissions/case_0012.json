@@ -1,0 +1,22 @@
+{
+  "case_id": "case_0012",
+  "submitted_at": "2026-05-26T15:30:00Z",
+  "patient": {
+    "patient_id": "pt_anon_0009",
+    "age": 75,
+    "sex": "M"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Surveillance CT chest 6 months post-lobectomy for stage IIB NSCLC. Patient has stage 3 CKD (eGFR 38) — pulmonologist requesting contrast despite renal limitations."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.31",
+    "diagnosis_text": "Malignant neoplasm of lower lobe, right bronchus",
+    "prior_imaging": [{"modality": "CT", "date": "2025-12-15"}],
+    "supporting_notes": "Pathologic staging pT2bN1M0, Stage IIB. Right lower lobectomy 2025-11-20. Adjuvant carboplatin/pemetrexed completed 2026-03. Comorbidities: COPD (FEV1 52% predicted), CKD stage 3 (eGFR 38), AFib on apixaban. Contrast concern: nephrologist consulted, recommends hydration protocol. Pulmonologist requests contrast for adequate mediastinal evaluation."
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

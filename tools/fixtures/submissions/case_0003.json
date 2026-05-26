@@ -1,0 +1,22 @@
+{
+  "case_id": "case_0003",
+  "submitted_at": "2026-05-25T11:42:00Z",
+  "patient": {
+    "patient_id": "pt_anon_0003",
+    "age": 71,
+    "sex": "M"
+  },
+  "imaging_request": {
+    "modality": "CT",
+    "body_region": "chest",
+    "with_contrast": true,
+    "indication_text": "Surveillance CT chest 6 months post-lobectomy for biopsy-proven stage IIB NSCLC, right lower lobe. Patient on adjuvant carboplatin/pemetrexed completed February 2026."
+  },
+  "clinical_indication": {
+    "diagnosis_code": "C34.31",
+    "diagnosis_text": "Malignant neoplasm of lower lobe, right bronchus",
+    "prior_imaging": [{"modality": "CT", "date": "2025-12-08"}],
+    "supporting_notes": "Pathologic staging pT3N1M0, Stage IIB confirmed post-resection. Adjuvant chemotherapy 4 cycles completed. Oncologist requests routine 6-month surveillance per NCCN guidelines."
+  },
+  "policy_id": "oncology_imaging_routine_v1"
+}

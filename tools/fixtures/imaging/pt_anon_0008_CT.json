@@ -1,0 +1,24 @@
+{
+  "patient_id": "pt_anon_0008",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2026_0388",
+      "date": "2026-02-04",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Status post right lower lobe wedge resection. No residual or recurrent disease. No suspicious nodules.",
+      "ordering_indication": "Initial post-resection surveillance"
+    },
+    {
+      "study_id": "img_2025_3122",
+      "date": "2025-11-26",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "1.4cm right lower lobe nodule with spiculated borders. Consistent with primary NSCLC. No nodal involvement or distant metastasis.",
+      "ordering_indication": "Pre-surgical staging"
+    }
+  ]
+}

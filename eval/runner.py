@@ -2,12 +2,17 @@
 GPA v4 Eval Runner — eval/runner.py
 
 Runs the eval harness against the ground truth dataset.
-Unit mode (SKIP_INTEGRATION_TESTS=1): scores only computable dimensions.
+Unit mode (SKIP_INTEGRATION_TESTS=1): scores only computable dimensions with stubs.
 Integration mode: runs full pipeline via live Claude SDK calls.
 
+Per scope §7, eval has two layers:
+  - PER-CASE dimensions: source_citation, ai_decision_limit, faithfulness, reproducibility.
+  - AGGREGATE dimensions: adversarial_gate_bypass_rate, false_escalation_rate,
+    confidence_calibration, cohens_kappa.
+
 Usage:
-    python eval/runner.py                    # unit mode scoring only
-    SKIP_INTEGRATION_TESTS=0 python eval/runner.py  # full live run
+    PYTHONPATH=. python eval/runner.py                    # unit mode
+    SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py  # full live run
 """
 
 from __future__ import annotations
@@ -15,7 +20,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -23,12 +28,12 @@ from eval.dimensions import (
     DimensionScore,
     score_source_citation_accuracy,
     score_ai_decision_limit,
-    score_gate_bypass_rate,
-    score_schema_compliance,
-    score_uncertainty_flag_coverage,
-    score_overall_signal_match,
     score_rationale_faithfulness,
     score_decision_reproducibility,
+    score_adversarial_gate_bypass_rate,
+    score_false_escalation_rate,
+    score_confidence_calibration,
+    score_cohens_kappa,
 )
 
 
@@ -40,9 +45,14 @@ from eval.dimensions import (
 class EvalCase:
     case_id: str
     ground_truth: dict
-    pipeline_result: Any | None       # PipelineResult or None in unit mode
-    dimension_scores: list[DimensionScore]
+    pipeline_result: Any | None             # PipelineResult or None in unit mode
+    dimension_scores: list[DimensionScore]  # per-case scores only
     overall_pass: bool
+    # Cached artifacts needed by aggregate scoring after the loop
+    reasoning_brief: dict
+    policy_map: dict
+    pipeline_status: str
+    gates_fired: list[str]
 
 
 # ---------------------------------------------------------------------------
@@ -67,10 +77,7 @@ def _load_ground_truth() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def _make_unit_mode_brief(ground_truth: dict) -> dict:
-    """
-    Build a minimal reasoning_brief stub for unit-mode scoring.
-    Flags count is set to the minimum expected for the case.
-    """
+    """Minimal reasoning_brief stub for unit-mode scoring."""
     min_flags = ground_truth.get("expected_uncertainty_flag_count_min", 0)
     flags = [
         {"flag": f"stub_flag_{i}", "source_ref": "none"}
@@ -83,93 +90,133 @@ def _make_unit_mode_brief(ground_truth: dict) -> dict:
 
 
 def _make_unit_mode_policy_map(ground_truth: dict) -> dict:
-    """Build a minimal policy_map stub that matches the expected signal."""
+    """Minimal policy_map stub matching expected signal."""
     return {
         "overall_signal": ground_truth.get("expected_overall_signal", "unknown"),
         "criteria": [],
     }
 
 
-def _make_unit_mode_gate_events() -> list[dict]:
-    """In unit mode, report all standard gates as fired."""
-    return [
-        {"gate": "admission", "fired": True},
-        {"gate": "source_verification", "fired": True},
-        {"gate": "ai_decision_limit", "fired": True},
-        {"gate": "denial", "fired": True},
-    ]
-
-
 # ---------------------------------------------------------------------------
 # Core eval runner
 # ---------------------------------------------------------------------------
 
-def run_eval(live: bool = False) -> list[EvalCase]:
+REPRODUCIBILITY_RUNS = 5
+
+
+def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
     """
     Run the eval harness against the ground truth dataset.
 
-    Args:
-        live: If True, load submissions and call run_pipeline() for each case.
-              If False, use stub data and score only computable dimensions.
-
     Returns:
-        List of EvalCase — one per ground truth record.
+        (per_case_results, aggregate_scores)
     """
     ground_truth_records = _load_ground_truth()
     eval_cases: list[EvalCase] = []
 
     for gt in ground_truth_records:
         case_id = gt["case_id"]
-
         if live:
-            eval_case = _run_live_case(case_id, gt)
+            eval_cases.append(_run_live_case(case_id, gt))
         else:
-            eval_case = _run_unit_case(case_id, gt)
+            eval_cases.append(_run_unit_case(case_id, gt))
 
-        eval_cases.append(eval_case)
+    # Compute aggregate dimensions across the whole suite
+    cases_for_aggregates = [
+        {
+            "case_id": ec.case_id,
+            "ground_truth": ec.ground_truth,
+            "reasoning_brief": ec.reasoning_brief,
+            "policy_map": ec.policy_map,
+            "pipeline_status": ec.pipeline_status,
+            "gates_fired": ec.gates_fired,
+            "per_case_scores": {
+                ds.dimension: ds.score
+                for ds in ec.dimension_scores
+                if ds.score is not None
+            },
+        }
+        for ec in eval_cases
+    ]
+    aggregate_scores = [
+        score_adversarial_gate_bypass_rate(cases_for_aggregates),
+        score_false_escalation_rate(cases_for_aggregates),
+        score_confidence_calibration(cases_for_aggregates),
+        score_cohens_kappa(cases_for_aggregates),
+    ]
+    return eval_cases, aggregate_scores
 
-    return eval_cases
+
+def _per_case_scores(
+    reasoning_brief: dict,
+    policy_map: dict,
+    submission: dict,
+    context: dict,
+    agent_outputs: list[dict],
+    agent_names: list[str],
+    overall_signals: list[str | None] | None,
+) -> list[DimensionScore]:
+    """Score the 4 per-case dimensions."""
+    return [
+        score_source_citation_accuracy(reasoning_brief),
+        score_ai_decision_limit(agent_outputs, agent_names),
+        (
+            score_rationale_faithfulness(reasoning_brief, submission, context, policy_map)
+            if overall_signals is not None
+            else _deferred("rationale_faithfulness", ">=0.80")
+        ),
+        (
+            score_decision_reproducibility(overall_signals)
+            if overall_signals is not None
+            else _deferred("decision_reproducibility", ">=0.80")
+        ),
+    ]
+
+
+def _deferred(name: str, target: str) -> DimensionScore:
+    return DimensionScore(
+        dimension=name,
+        score=None,
+        target=target,
+        passed=None,
+        notes="Not computed in unit mode (requires live SDK run).",
+    )
+
+
+def _compute_overall_pass(scores: list[DimensionScore]) -> bool:
+    for s in scores:
+        if s.passed is not None and not s.passed:
+            return False
+    return True
 
 
 def _run_unit_case(case_id: str, ground_truth: dict) -> EvalCase:
-    """Score a case without a live pipeline run."""
     reasoning_brief = _make_unit_mode_brief(ground_truth)
     policy_map = _make_unit_mode_policy_map(ground_truth)
-    gate_events = _make_unit_mode_gate_events()
-
-    # Minimal stubs for dimensions that need agent outputs / schema results
-    agent_outputs: list[dict] = []
-    agent_names: list[str] = []
-    schemas_valid: list[bool] = []
-
-    scores = _score_all(
+    scores = _per_case_scores(
         reasoning_brief=reasoning_brief,
         policy_map=policy_map,
         submission={},
         context={},
-        gate_events=gate_events,
-        agent_outputs=agent_outputs,
-        agent_names=agent_names,
-        schemas_valid=schemas_valid,
-        ground_truth=ground_truth,
+        agent_outputs=[],
+        agent_names=[],
         overall_signals=None,
     )
-
-    overall_pass = _compute_overall_pass(scores)
     return EvalCase(
         case_id=case_id,
         ground_truth=ground_truth,
         pipeline_result=None,
         dimension_scores=scores,
-        overall_pass=overall_pass,
+        overall_pass=_compute_overall_pass(scores),
+        reasoning_brief=reasoning_brief,
+        policy_map=policy_map,
+        pipeline_status="unit_mode",
+        gates_fired=["admission", "source_verification", "ai_decision_limit", "denial"],
     )
 
 
-REPRODUCIBILITY_RUNS = 5
-
-
 def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
-    """Run the pipeline N times (for reproducibility) and score all dimensions."""
+    """Run the pipeline N times (for reproducibility) and score per-case dimensions."""
     from orchestrator.pipeline import run_pipeline
 
     fixtures_dir = (
@@ -180,14 +227,11 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
     submission = json.loads(submission_path.read_text(encoding="utf-8"))
 
     pipeline_results = [run_pipeline(submission) for _ in range(REPRODUCIBILITY_RUNS)]
-
     overall_signals: list[str | None] = []
     for pr in pipeline_results:
         pm = (pr.determination or {}).get("policy_map", {}) if pr.determination else {}
         overall_signals.append(pm.get("overall_signal") if isinstance(pm, dict) else None)
 
-    # Use the first successful run for per-case dimensions; if none succeeded,
-    # fall back to the first run so failure-mode dimensions still score correctly.
     primary = next(
         (pr for pr in pipeline_results if pr.determination),
         pipeline_results[0],
@@ -205,98 +249,51 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
             "policy_mapper",
             "reasoning_drafter",
         ]
-        schemas_valid = [isinstance(o, dict) for o in agent_outputs]
     else:
         reasoning_brief = {}
         policy_map = {}
         context = {}
-        findings = {}
         agent_outputs = []
         agent_names = []
-        schemas_valid = []
 
-    gate_events = [
-        {"gate": "admission", "fired": True},
-        {"gate": "source_verification", "fired": primary.status != "escalated"},
-        {"gate": "ai_decision_limit", "fired": True},
-        {"gate": "denial", "fired": True},
-    ]
+    # Track which gates fired for this case (admission always fires; source_verification
+    # gating depends on pipeline reaching that step)
+    gates_fired = ["admission"]
+    if primary.status != "failed":
+        gates_fired.append("source_verification")
+    gates_fired.append("ai_decision_limit")
+    gates_fired.append("denial")
 
-    scores = _score_all(
+    scores = _per_case_scores(
         reasoning_brief=reasoning_brief,
         policy_map=policy_map,
         submission=submission,
         context=context,
-        gate_events=gate_events,
         agent_outputs=agent_outputs,
         agent_names=agent_names,
-        schemas_valid=schemas_valid,
-        ground_truth=ground_truth,
         overall_signals=overall_signals,
     )
-
-    overall_pass = _compute_overall_pass(scores)
     return EvalCase(
         case_id=case_id,
         ground_truth=ground_truth,
         pipeline_result=primary,
         dimension_scores=scores,
-        overall_pass=overall_pass,
+        overall_pass=_compute_overall_pass(scores),
+        reasoning_brief=reasoning_brief,
+        policy_map=policy_map,
+        pipeline_status=primary.status,
+        gates_fired=gates_fired,
     )
-
-
-def _score_all(
-    reasoning_brief: dict,
-    policy_map: dict,
-    submission: dict,
-    context: dict,
-    gate_events: list[dict],
-    agent_outputs: list[dict],
-    agent_names: list[str],
-    schemas_valid: list[bool],
-    ground_truth: dict,
-    overall_signals: list[str | None] | None = None,
-) -> list[DimensionScore]:
-    return [
-        score_source_citation_accuracy(reasoning_brief),
-        score_ai_decision_limit(agent_outputs, agent_names),
-        score_gate_bypass_rate(gate_events),
-        score_schema_compliance(agent_outputs, schemas_valid),
-        score_uncertainty_flag_coverage(reasoning_brief, ground_truth),
-        score_overall_signal_match(policy_map, ground_truth),
-        score_rationale_faithfulness(reasoning_brief, submission, context, policy_map)
-            if overall_signals is not None
-            else _deferred("rationale_faithfulness", ">=0.80"),
-        score_decision_reproducibility(overall_signals)
-            if overall_signals is not None
-            else _deferred("decision_reproducibility", ">=0.80"),
-    ]
-
-
-def _deferred(name: str, target: str) -> DimensionScore:
-    return DimensionScore(
-        dimension=name,
-        score=None,
-        target=target,
-        passed=None,
-        notes="Not computed in unit mode.",
-    )
-
-
-def _compute_overall_pass(scores: list[DimensionScore]) -> bool:
-    """All computable (non-None) dimensions must pass."""
-    for s in scores:
-        if s.passed is not None and not s.passed:
-            return False
-    return True
 
 
 # ---------------------------------------------------------------------------
 # Report printer
 # ---------------------------------------------------------------------------
 
-def print_report(eval_cases: list[EvalCase]) -> None:
-    """Print a Markdown-formatted eval report to stdout."""
+def print_report(
+    eval_cases: list[EvalCase], aggregate_scores: list[DimensionScore]
+) -> None:
+    """Markdown-formatted eval report to stdout."""
     live = any(ec.pipeline_result is not None for ec in eval_cases)
     mode = "live" if live else "unit"
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -307,18 +304,19 @@ def print_report(eval_cases: list[EvalCase]) -> None:
     print()
 
     total = len(eval_cases)
-    passed = sum(1 for ec in eval_cases if ec.overall_pass)
-    failed = total - passed
+    per_case_passed = sum(1 for ec in eval_cases if ec.overall_pass)
+    aggregate_passed = sum(1 for s in aggregate_scores if s.passed)
+    aggregate_total = sum(1 for s in aggregate_scores if s.passed is not None)
 
     print("## Summary")
     print(f"Cases run: {total}")
-    print(f"Cases passed: {passed}")
-    print(f"Cases failed: {failed}")
+    print(f"Cases passing per-case dims: {per_case_passed}/{total}")
+    print(f"Aggregate dims passing: {aggregate_passed}/{aggregate_total}")
     print()
 
+    # Per-case section
     print("## Per-Case Results")
     print()
-
     for ec in eval_cases:
         label = ec.ground_truth.get("label", "")
         status = "PASS" if ec.overall_pass else "FAIL"
@@ -327,14 +325,24 @@ def print_report(eval_cases: list[EvalCase]) -> None:
         print("| Dimension | Score | Target | Status |")
         print("|---|---|---|---|")
         for ds in ec.dimension_scores:
-            if ds.score is None:
-                score_str = "N/A"
-                status_str = "—"
-            else:
-                score_str = f"{ds.score:.2f}"
-                status_str = "✓" if ds.passed else "✗"
+            score_str = "N/A" if ds.score is None else f"{ds.score:.2f}"
+            status_str = "—" if ds.passed is None else ("✓" if ds.passed else "✗")
             print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} |")
         print()
+
+    # Aggregate section
+    print("## Aggregate (Suite-Wide) Results")
+    print()
+    print("| Dimension | Score | Target | Status | Notes |")
+    print("|---|---|---|---|---|")
+    for ds in aggregate_scores:
+        score_str = "N/A" if ds.score is None else f"{ds.score:.3f}"
+        status_str = "—" if ds.passed is None else ("✓" if ds.passed else "✗")
+        notes_short = (ds.notes or "").replace("|", "\\|").replace("\n", " ")
+        if len(notes_short) > 90:
+            notes_short = notes_short[:87] + "..."
+        print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} | {notes_short} |")
+    print()
 
     if not live:
         print("## Dimensions Not Scored In Unit Mode")
@@ -349,5 +357,5 @@ def print_report(eval_cases: list[EvalCase]) -> None:
 
 if __name__ == "__main__":
     live = os.environ.get("SKIP_INTEGRATION_TESTS", "1") != "1"
-    cases = run_eval(live=live)
-    print_report(cases)
+    per_case, aggregates = run_eval(live=live)
+    print_report(per_case, aggregates)

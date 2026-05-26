@@ -1,0 +1,33 @@
+{
+  "patient_id": "pt_anon_0004",
+  "age": 66,
+  "sex": "F",
+  "prior_authorizations": [
+    {
+      "auth_id": "auth_2025_1955",
+      "date": "2025-09-05",
+      "modality": "CT",
+      "body_region": "chest",
+      "outcome": "approved",
+      "payer": "SimulatedPayer",
+      "indication": "Initial post-resection surveillance, stage IB NSCLC right upper lobe"
+    }
+  ],
+  "relevant_diagnoses": [
+    {
+      "code": "C34.11",
+      "text": "Malignant neoplasm of upper lobe, right bronchus",
+      "date": "2025-06-22",
+      "status": "active",
+      "staging_note": "Pathologic staging pT2aN0M0, Stage IB"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Osimertinib",
+      "dose": "80mg daily",
+      "start_date": "2025-08-01",
+      "indication": "Adjuvant therapy for EGFR L858R-mutated NSCLC"
+    }
+  ]
+}

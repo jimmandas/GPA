@@ -1,0 +1,24 @@
+{
+  "patient_id": "pt_anon_0006",
+  "modality": "CT",
+  "imaging_history": [
+    {
+      "study_id": "img_2026_0488",
+      "date": "2026-02-20",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Stable post-treatment changes in right upper lobe and right hilum. No new pulmonary nodules. No mediastinal lymphadenopathy. Continued response to therapy.",
+      "ordering_indication": "Surveillance imaging on durvalumab maintenance"
+    },
+    {
+      "study_id": "img_2025_2207",
+      "date": "2025-09-15",
+      "modality": "CT",
+      "body_region": "chest",
+      "with_contrast": true,
+      "finding": "Significant reduction in right upper lobe mass and mediastinal lymphadenopathy following chemoradiation. Partial response per RECIST 1.1.",
+      "ordering_indication": "Post-chemoradiation response assessment"
+    }
+  ]
+}
