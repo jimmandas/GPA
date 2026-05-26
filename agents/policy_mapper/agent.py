@@ -22,6 +22,7 @@ import yaml
 from claude_agent_sdk import ClaudeAgentOptions, query
 
 from .schema_validator import validate_policy_map
+from .aggregate import aggregate_overall_signal
 from logs.bilateral_logger import get_logger, BilateralLoggerError
 
 # ---------------------------------------------------------------------------
@@ -338,5 +339,36 @@ async def run(findings: dict, context: dict, case_id: str) -> dict:
             "jsonschema_validation_error",
             f"Schema validation failed: {exc.message}",
         ) from exc
+
+    # --- v2 fix: deterministic aggregation of overall_signal ---------------
+    # Per ADR-002 / scope §11 / ADR-009: the LLM produces per-criterion
+    # judgments, Python computes the aggregate. Removes the dominant source
+    # of reproducibility flakiness on judgment-intensive cases.
+    llm_overall = parsed.get("overall_signal")
+    try:
+        deterministic_overall = aggregate_overall_signal(parsed.get("criteria", []))
+    except ValueError as exc:
+        # Should not happen if schema validation passed, but fail-closed.
+        raise PolicyMapperError(
+            "aggregation_error",
+            f"Could not aggregate overall_signal: {exc}",
+        ) from exc
+
+    if llm_overall != deterministic_overall:
+        # Auditable record: when LLM and deterministic aggregator disagree,
+        # the deterministic value wins but the divergence is logged.
+        get_logger().commit(case_id, {
+            "type": "policy_aggregation_override_event",
+            "agent": "policy_mapper",
+            "case_id": case_id,
+            "llm_overall_signal": llm_overall,
+            "deterministic_overall_signal": deterministic_overall,
+            "criteria_statuses": [
+                {"passage_id": c.get("passage_id"), "status": c.get("status")}
+                for c in parsed.get("criteria", [])
+            ],
+            "at": _now_iso(),
+        })
+        parsed["overall_signal"] = deterministic_overall
 
     return parsed
