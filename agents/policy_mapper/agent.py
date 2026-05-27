@@ -2,8 +2,17 @@
 Policy Mapper Agent — GPA v4 MVP
 
 Pre-fetch mapper: calls nccn_passage_lookup directly, injects results into
-the prompt, uses query() to map each criterion against submission evidence.
+the prompt, calls the LLM to map each criterion against submission evidence.
 Returns a schema-validated policy_map dict. Fail-closed, audit-logged.
+
+SDK choice is env-var-gated (v3 work):
+  POLICY_MAPPER_SDK=anthropic_direct → direct anthropic SDK with temperature=0
+                                       (closes ADR-002 determinism gap)
+  default                            → claude_agent_sdk via CLI subprocess
+                                       (matches the other 3 agents)
+
+See ADR-010 for the rationale on why this agent specifically opts into a
+different SDK stack.
 
 Module-level initialization (runs at import):
   - Loads system prompt from prompts/policy_mapper.md
@@ -13,6 +22,7 @@ Module-level initialization (runs at import):
 
 import hashlib
 import json
+import os
 import pathlib
 from datetime import datetime, timezone
 
@@ -133,6 +143,56 @@ _AGENT_OPTIONS = ClaudeAgentOptions(
     max_turns=1,
     allowed_tools=[],
 )
+
+# v3 SDK choice: env-var-gated. See ADR-010.
+_USE_ANTHROPIC_DIRECT = (
+    os.environ.get("POLICY_MAPPER_SDK", "").lower() == "anthropic_direct"
+)
+
+# Lazy-initialized so the agent module can import without ANTHROPIC_API_KEY set
+# (e.g., during unit tests that mock the SDK call entirely).
+_anthropic_client = None
+
+
+def _get_anthropic_client():
+    """Lazy-init the anthropic AsyncAnthropic client (v3 only)."""
+    global _anthropic_client
+    if _anthropic_client is None:
+        from anthropic import AsyncAnthropic
+        _anthropic_client = AsyncAnthropic()
+    return _anthropic_client
+
+
+async def _call_via_anthropic_direct(user_prompt: str) -> str:
+    """
+    v3 path: direct anthropic SDK with temperature=0.
+
+    Closes the ADR-002 known gap (claude_agent_sdk does not support
+    temperature parameter). Used for policy_mapper specifically because
+    its per-criterion judgments are the dominant source of reproducibility
+    flakiness on judgment-intensive cases (see v1-to-v2-delta.md).
+    """
+    client = _get_anthropic_client()
+    response = await client.messages.create(
+        model=_MODEL_SNAPSHOT,
+        max_tokens=4096,
+        temperature=0.0,
+        system=_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    text_parts = [block.text for block in response.content if hasattr(block, "text")]
+    return "".join(text_parts)
+
+
+async def _call_via_claude_agent_sdk(user_prompt: str) -> str:
+    """v2 (default) path: claude_agent_sdk via CLI subprocess."""
+    final_text = ""
+    async for message in query(prompt=user_prompt, options=_AGENT_OPTIONS):
+        if hasattr(message, "content") and message.content:
+            for block in message.content:
+                if hasattr(block, "text"):
+                    final_text += block.text
+    return final_text
 
 
 # ---------------------------------------------------------------------------
@@ -257,15 +317,16 @@ async def run(findings: dict, context: dict, case_id: str) -> dict:
     user_prompt_hash = _sha256_hex(user_prompt)
 
     # --- SDK call -----------------------------------------------------------
+    # Dispatched on POLICY_MAPPER_SDK env var; see ADR-010.
+    sdk_used = "anthropic-direct" if _USE_ANTHROPIC_DIRECT else "claude_agent_sdk"
     sdk_exception: Exception | None = None
     final_text: str = ""
 
     try:
-        async for message in query(prompt=user_prompt, options=_AGENT_OPTIONS):
-            if hasattr(message, "content") and message.content:
-                for block in message.content:
-                    if hasattr(block, "text"):
-                        final_text += block.text
+        if _USE_ANTHROPIC_DIRECT:
+            final_text = await _call_via_anthropic_direct(user_prompt)
+        else:
+            final_text = await _call_via_claude_agent_sdk(user_prompt)
     except PolicyMapperError:
         raise
     except Exception as exc:
@@ -283,6 +344,8 @@ async def run(findings: dict, context: dict, case_id: str) -> dict:
         "agent": "policy_mapper",
         "case_id": case_id,
         "model_snapshot": _MODEL_SNAPSHOT,
+        "sdk_used": sdk_used,
+        "temperature": 0.0 if _USE_ANTHROPIC_DIRECT else None,
         "prompt_hash": _PROMPT_HASH,
         "user_prompt_hash": user_prompt_hash,
         "tool_calls_made": tool_calls_made,
