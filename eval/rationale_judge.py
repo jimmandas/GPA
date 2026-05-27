@@ -31,7 +31,14 @@ import os
 import re
 
 
-_JUDGE_MODEL = os.environ.get("FAITHFULNESS_JUDGE_MODEL", "gpt-4o")
+# Pinned snapshot, not the `gpt-4o` alias. Aliases let OpenAI re-route the
+# underlying model silently, which would drift faithfulness scores without
+# any change on our side. A pinned snapshot makes the judge model part of
+# the audit record — a regulator can see exactly which model produced the
+# verdict. Bumping the snapshot requires a full eval re-run (same rule as
+# config/model.yaml on the agent side).
+_DEFAULT_JUDGE_SNAPSHOT = "gpt-4o-2024-11-20"
+_JUDGE_MODEL = os.environ.get("FAITHFULNESS_JUDGE_MODEL", _DEFAULT_JUDGE_SNAPSHOT)
 
 # Published per scope §7 — keep this prompt under version control so the eval
 # report can reproduce judge behavior.
