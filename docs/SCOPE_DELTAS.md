@@ -7,7 +7,8 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 **Labels:**
 
 - **scope-addition** — new work explicitly approved (beyond what the docs anticipated)
-- **scope-deviation** — deliberately differs from the docs
+- **scope-removal** — work named in the docs that we are explicitly cutting
+- **scope-deviation** — deliberately differs from the docs (kept but altered)
 - **scope-drift** — unintentional misalignment (to be corrected)
 - **scope-clarification** — interpretation of ambiguous spec (not a real change)
 
@@ -95,6 +96,49 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 - **What:** Initial commit `aef464f` named the EVAL_TIER ADR as ADR-015. Phase 2 plan reserves ADR-015 for "Confidence threshold calibration." Renumbered to ADR-017.
 - **Why:** Drift caught during baseline reconciliation against the Phase 2 plan.
 - **Resolution:** File renamed; references updated.
+
+---
+
+### scope-removal: EHR FHIR stub upgrade (Phase 2 Week 10)
+
+- **Date logged:** 2026-05-27
+- **Decision:** User cut from scope (Jim, 2026-05-27): *"not sure the product needs this"*
+- **What was named:** Phase 2 plan §"Tool Layer" — *"patient_history_lookup / prior_imaging_lookup — responses now conform to HL7 FHIR R4 resource schemas (Patient, DiagnosticReport, ImagingStudy)."* Also Determinism Contract invariant 14 ("EHR stub schemas version-pinned").
+- **Why cut:** Customer anchor is the nurse. The shape of underlying data (ad-hoc JSON vs. FHIR) is invisible to her. FHIR is a production-integration concern that ties to real EHR work (Phase 3), not a governance / judgment concern. Building synthetic FHIR is finicky for symbolic value.
+- **Where it goes:** `PHASE_3_BACKLOG.md` — tied to existing item #2 "Real EHR integration."
+
+### scope-removal: EvidenceLineageBuilder (Phase 2 Week 11)
+
+- **Date logged:** 2026-05-27
+- **Decision:** User cut from scope (Jim, 2026-05-27)
+- **What was named:** Phase 2 plan §"New Agents and Tools" — *"Constructs evidence lineage from Source Verification Gate records for the provider explanation API."*
+- **Why cut:** Its sole consumer (Provider Explanation API upgrade) is also being cut. The Source Verification Gate already enforces per-claim citations; a separate lineage-builder is provider-experience tooling, not governance tooling. Nurse-anchored customer model makes this provider-track work.
+- **Where it goes:** `PHASE_3_BACKLOG.md` — bundled under provider experience track (new item, see below).
+
+### scope-removal: Provider Explanation API upgrade (Phase 2 Week 11)
+
+- **Date logged:** 2026-05-27
+- **Decision:** User cut from scope (Jim, 2026-05-27)
+- **What was named:** Phase 2 plan §"What Changes from MVP" — *"Provider explanation: basic structured rationale → full rationale with evidence lineage."*
+- **Why cut:** Provider-facing surface area is strategy OKR3, not the GPA build's customer anchor. Without the lineage builder, this has no upgrade path anyway.
+- **Where it goes:** `PHASE_3_BACKLOG.md` — provider experience track.
+
+### scope-removal: Dataset expansion 15 → 50-75 cases (Phase 2 Week 12)
+
+- **Date logged:** 2026-05-27
+- **Decision:** User cut from scope (Jim, 2026-05-27)
+- **What was named:** Phase 2 plan §"Eval Expansion" — *"Expand from 25-30 cases to 50-75 cases."*
+- **Why cut:** Build holds 15 cases (mix of clean / judgment-intensive / adversarial). The architecture is proven; statistical power on the eval is a Phase 3 calibration question, not a Phase 2 ship-gate question.
+- **Caveat:** Original MVP target per scope §7 was 25-30 cases. We are below that. The build is making a deliberate decision to ship at 15 with a documented limitation rather than chase 25-30 or 50-75. Recommend naming this explicitly in the final eval report.
+- **Where it goes:** `PHASE_3_BACKLOG.md` — bundled with multi-rater labeling at scale (item #4).
+
+### scope-removal: Evidence Lineage Completeness eval dim (Phase 2 Week 12)
+
+- **Date logged:** 2026-05-27
+- **Decision:** User cut from scope (Jim, 2026-05-27) — Option 1: drop the dim alongside the tooling that would have produced its substrate.
+- **What was named:** Phase 2 plan §"New eval dimensions" — *"Evidence Lineage Completeness: Does the provider explanation API trace every claim back to a specific retrieved passage?"*
+- **Why cut:** With EvidenceLineageBuilder and Provider Explanation API upgrade both cut, the dim has no substrate to score. Keeping the dim would have meant either (a) reinterpreting it as a redundant copy of `source_citation_accuracy` or (b) leaving it permanently N/A.
+- **Where it goes:** `PHASE_3_BACKLOG.md` — provider experience track.
 
 ---
 

@@ -71,3 +71,30 @@
 - **Date logged:** 2026-05-27 — **partially shipped this session**
 - **What:** Phase 2 plan §11 calls for physician action events to flow into the same audit trail as nurse decisions. Today: shipped at the record_action() boundary, writes to per-case `decision_log/{case_id}.jsonl`. Phase 3 extension: add a cross-case "audit trail explorer" view to surface every physician action across cases for compliance reporting.
 - **Trigger to prioritize:** Compliance reporting becomes a real requirement (intersects with item #9).
+
+### 14. EHR FHIR stub upgrade (cut from Phase 2)
+
+- **Date logged:** 2026-05-27 (cut from Phase 2)
+- **What:** Upgrade `patient_history_lookup` / `prior_imaging_lookup` from ad-hoc JSON fixtures to HL7 FHIR R4 resource schemas (Patient, DiagnosticReport, ImagingStudy). Version-pin schemas in `config/tool_registry.yaml` per Determinism Contract invariant 14.
+- **Why deferred:** Customer anchor is the nurse; the underlying data shape is invisible to her. FHIR is a production-integration concern tied to real EHR work, not a governance/judgment concern.
+- **Trigger to prioritize:** Bundled with item #2 (Real EHR integration). They prioritize together — there's no value in synthetic FHIR without real EHR plumbing on the other end.
+
+### 15. Provider Experience Track — bundle (cut from Phase 2)
+
+- **Date logged:** 2026-05-27 (cut from Phase 2)
+- **What:** Three Phase 2 items that collectively serve provider experience (strategy OKR3, not the GPA build's customer anchor):
+  - **EvidenceLineageBuilder** — pure-function tool that constructs evidence lineage from Source Verification Gate records
+  - **Provider Explanation API upgrade** — full rationale with evidence lineage end-to-end (replaces "basic structured rationale")
+  - **Evidence Lineage Completeness eval dim** — scores whether the API traces every claim back to a specific retrieved passage
+- **Why deferred:** Strategy OKR3 ("Provider Flywheel") is a different strategy track than what the GPA build targets (nurse-anchored governance proof per OKR2). Phase 2 plan named these because the original framing treated provider experience as a strategic dependency; the nurse-anchor decision (2026-05-27) made these explicitly out of scope for this build.
+- **Trigger to prioritize:** Strategy OKR3 work is greenlit OR a payer / provider stakeholder commits to using a provider-facing surface (status visibility, rationale visibility, digital intake).
+- **Dependencies:** Some Phase 3 items also unlock this — real EHR integration (#2) and runtime policy enforcement (#8) overlap.
+
+### 16. Dataset expansion to scope target (cut from Phase 2)
+
+- **Date logged:** 2026-05-27 (cut from Phase 2)
+- **What:** Expand the eval dataset from the current 15 cases to the scope §7 target (25-30) or the Phase 2 plan target (50-75).
+- **Current state:** 15 cases (4 clean / 6 judgment-intensive / 5 adversarial) — covers the architectural diversity but is below the scope §7 target of 25-30. The build ships at 15 with a documented limitation.
+- **Why deferred:** Statistical power is a calibration concern, not a governance-proof concern. The architecture works on 15 cases; scaling the dataset doesn't change what the system proves.
+- **Trigger to prioritize:** Multi-rater labeling at scale (#4) lands OR the eval results need tighter confidence intervals for a specific portfolio claim.
+- **Implication for the eval report:** The current report should explicitly name "n=15" as a limitation, with the scope §7 target (25-30) and Phase 2 plan target (50-75) cited as what production-grade evidence would require.

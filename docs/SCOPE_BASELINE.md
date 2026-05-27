@@ -87,28 +87,28 @@ Per `phase-2-agentic-rag-plan.md`:
 | 9 | pgvector + LlamaIndex setup | ⚠ **deviation** — built on Chroma (see deltas) |
 | 9 | Embedding model pinning + `RAGIndexValidator` | ✅ done (ADR-012, ADR-013) |
 | 9 | `nccn_passage_lookup` RAG upgrade | ✅ done (ChromaRetriever) |
-| 10 | EHR stub upgrade (FHIR-structured) | ⏳ pending |
+| 10 | EHR stub upgrade (FHIR-structured) | ❌ **REMOVED 2026-05-27** (nurse anchor; provider/EHR is Phase 3) |
 | 10 | Tool registry version-pinning | ✅ done (config/tool_registry.yaml) |
 | 10 | Denial Gate routing logic | ✅ done (ADR-014) |
 | 10 | `PhysicianQueueAgent` scaffolded | ✅ done (`physician_queue/`) |
 | 11 | Physician queue UI | ✅ done (`ui/physician_queue.html` + `ui/physician_workspace.html` + 3 API endpoints) |
 | 11 | Physician action handlers | ✅ done (`record_action()`) |
-| 11 | Bilateral Logger extension for physician_action | ✅ done (this session) |
-| 11 | `EvidenceLineageBuilder` | ⏳ pending |
-| 11 | Provider explanation API upgrade | ⏳ pending |
-| 12 | 50-75 case dataset | ⚠ **partial** — have 15, scope target is 50-75 |
-| 12 | `ConfidenceCalibrator` | ⏳ pending |
-| 12 | Threshold recommendations | ⏳ pending |
-| 12 | Full eval run + ADRs merged | ⏳ partial — eval framework live; ADRs 015-016 pending |
+| 11 | Bilateral Logger extension for physician_action | ✅ done |
+| 11 | `EvidenceLineageBuilder` | ❌ **REMOVED 2026-05-27** (provider track; Phase 3) |
+| 11 | Provider explanation API upgrade | ❌ **REMOVED 2026-05-27** (provider track; Phase 3) |
+| 12 | 50-75 case dataset | ❌ **REMOVED 2026-05-27** (ship at 15 with documented limitation) |
+| 12 | `ConfidenceCalibrator` | ⏳ pending — overlaps with runtime confidence gate (ADR-015) |
+| 12 | Threshold recommendations | ⏳ pending — depends on ConfidenceCalibrator |
+| 12 | Full eval run + ADRs merged | ⏳ partial — eval framework live; ADRs 015-016 + ship-tier run pending |
 
 ### Phase 2 new eval dimensions
 
 | Dimension | Status |
 |---|---|
 | RAG Passage Relevance | ⏳ pending |
-| Evidence Lineage Completeness | ⏳ pending |
-| Physician Queue Routing Accuracy | ✅ done (this session) |
-| Physician Rationale Compliance | ✅ done (this session) |
+| Evidence Lineage Completeness | ❌ **REMOVED 2026-05-27** (no substrate after provider track cuts) |
+| Physician Queue Routing Accuracy | ✅ done |
+| Physician Rationale Compliance | ✅ done |
 
 ---
 
