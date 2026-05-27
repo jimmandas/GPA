@@ -146,6 +146,10 @@ Tracked in `SCOPE_DELTAS.md`. Two active items:
 - **Runtime confidence gate** — not in original scope; user approved adding 2026-05-27. Maps to planned ADR-015.
 - **Bias monitoring** — not in original scope/strategy; user approved adding 2026-05-27. New ADR (018+).
 
+## Phase 3 Backlog
+
+Items explicitly deferred beyond Phase 2 (Weeks 9-12) live in `docs/PHASE_3_BACKLOG.md`. Includes the 9 items named in scope doc §"Phase 3 (Future)" plus additions logged during Phase 2 (e.g., Chroma → pgvector migration, multi-physician concurrency, stronger judge model overlay).
+
 ---
 
 ## How to use this file

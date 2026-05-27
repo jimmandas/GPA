@@ -107,6 +107,42 @@ The Phase 2 Week 9 scaffold doesn't commit to one. The `PolicyRetriever` interfa
 
 ---
 
+## Phase 3 Migration Path: Chroma → pgvector + LlamaIndex
+
+**Addendum, 2026-05-27.** Phase 2 chose `ChromaRetriever` as the concrete implementation of `PolicyRetriever`. The Phase 2 plan document originally specified pgvector + LlamaIndex. The interface in this ADR was designed to accept either — Chroma is the right Phase 2 choice; pgvector is the production target.
+
+**Why Chroma now:**
+
+- Zero-infrastructure for a solo POC build (no Postgres dependency)
+- Self-contained Python library; runs locally in `.spike-venv`
+- All Determinism Contract Phase 2 invariants (11-13) work identically — embedding model pinning, content hashing, corpus-rebuild policy are retriever-agnostic
+- The `PolicyRetriever` ABC makes the eventual swap mechanical (estimated <500 lines, no agent / prompt / schema changes)
+
+**Why pgvector + LlamaIndex at production scale:**
+
+- **HIPAA-eligible deployment posture.** Postgres has decades of HIPAA-eligible deployments and standard audit tooling. Chroma's regulated-deployment story is less established.
+- **Operational maturity.** Backup, replication, RBAC, observability, HA — standard Postgres tooling, all directly applicable to the vector index.
+- **Hybrid retrieval.** LlamaIndex provides BM25 + vector + reranking out of the box. NCCN passage IDs benefit from hybrid retrieval because exact passage ID matching matters; pure vector search alone can be brittle on structured citation IDs.
+- **Audit defensibility at scale.** Easier to defend a standard RDBMS-backed index to a regulator than an embedded vector DB.
+
+**Trigger conditions for prioritizing the migration:**
+
+1. Commitment to a regulated production deployment, OR
+2. Eval corpus exceeds Chroma's comfortable single-node scale (rough threshold: > 10k indexed passages OR > 100 concurrent queries), OR
+3. HIPAA-eligible cloud deployment is committed
+
+**Migration scope when activated:**
+
+- New `PgvectorRetriever` implementing the existing `PolicyRetriever` ABC
+- Index build script for pgvector (Postgres + pgvector extension)
+- LlamaIndex wrapper for hybrid retrieval
+- Determinism Contract invariants 11-13 carry over unchanged
+- Migration ADR — next available number, currently 018+
+
+**Logged in** `docs/PHASE_3_BACKLOG.md` (item #10).
+
+---
+
 ## Related ADRs
 
 - ADR-003 — Why MVP used fixture lookup (the lookup ADR-011 is replacing)

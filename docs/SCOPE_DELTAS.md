@@ -15,13 +15,20 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
-### scope-deviation: RAG stack = Chroma instead of pgvector + LlamaIndex
+### scope-clarification: RAG stack = Chroma now, pgvector at production scale
 
-- **Date logged:** 2026-05-27 (deviation predates the log; baseline reconciliation)
-- **Spec:** Phase 2 plan §"Tool Layer" — *"Index: pgvector database over full NCCN guideline corpus. Retrieval: LlamaIndex orchestration."*
+- **Date logged:** 2026-05-27 (clarification logged post-hoc during baseline reconciliation)
+- **Phase 2 plan spec:** *"Index: pgvector database over full NCCN guideline corpus. Retrieval: LlamaIndex orchestration."*
 - **Build:** ChromaRetriever (`rag/`) — local Chroma vector store
-- **Why:** TBD (Jim to confirm). Likely lower setup cost for a solo build; Chroma works locally without a Postgres dependency. Worth a one-paragraph addendum to ADR-011.
-- **Open question:** Does the deviation stick (update Phase 2 plan to reflect Chroma), or revert (rebuild on pgvector)?
+- **Why this is a clarification, not a deviation:** ADR-011 deliberately built a `PolicyRetriever` interface and listed Chroma, pgvector, and LanceDB as acceptable concrete implementations. Choosing Chroma for the POC is within the bounds ADR-011 already authorized. The Phase 2 plan was more prescriptive than ADR-011; the interface-first design reconciles them.
+- **What stays intact:**
+  - All Phase 2 Determinism Contract invariants (11-13) work with Chroma — embedding model pinning, content hashing, corpus-update rebuild policy
+  - `PolicyRetriever` ABC contract is unchanged; `ChromaRetriever` satisfies it cleanly
+  - Audit / evidence-lineage story works identically
+- **What's deferred to Phase 3:**
+  - Migration to pgvector + LlamaIndex for production HIPAA / operational story → logged in `PHASE_3_BACKLOG.md` (item #10) with explicit trigger conditions
+  - Hybrid retrieval (BM25 + vector) — LlamaIndex provides this; we'd build it ourselves on Chroma if needed earlier
+- **ADR follow-up:** ADR-011 gets a "Phase 3 Migration" section explicitly naming pgvector as the production target.
 
 ### scope-addition: EVAL_TIER (dev/Sonnet vs ship/Opus) — ADR-017
 
