@@ -17,6 +17,7 @@ from dataclasses import asdict
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from orchestrator.pipeline import _run_async, record_nurse_decision, PipelineResult
@@ -75,6 +76,17 @@ class PhysicianActionResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="GPA v4 Provider Explanation API", version="1.0.0")
+
+# CORS — the static UI is served on a different port (8001) than the API (8000),
+# so browser cross-origin requests need explicit allowance. Permissive policy
+# is appropriate for this single-machine MVP demo; production deployment would
+# narrow to known origins (see ADR-008 for the nurse workspace design notes).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/api/v1/health")
