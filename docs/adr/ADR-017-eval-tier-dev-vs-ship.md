@@ -1,9 +1,10 @@
-# ADR-015: Eval Tiers — Dev (Sonnet) vs. Ship (Opus)
+# ADR-017: Eval Tiers — Dev (Sonnet) vs. Ship (Opus)
 
 **Status:** Accepted
 **Date:** 2026-05-27
 **Owner:** Jim
 **Related:** ADR-009 (eval methodology), ADR-010 (policy_mapper SDK choice)
+**Numbering note:** Originally drafted as ADR-015. Renumbered to ADR-017 because Phase 2 plan reserves 015 for "Confidence threshold calibration" and 016 for "max_turns budget increase."
 
 ---
 
