@@ -112,9 +112,33 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
     Useful for v1↔v2 comparisons on the same subset, or for debugging a
     single flaky case without rerunning the whole suite.
 
+    In live mode, the RAGIndexValidator runs first (Determinism Contract
+    invariant 13 — fail fast on corpus drift). The active retriever mode
+    comes from RAG_RETRIEVER env var (default: active_mode in rag_index.yaml).
+
     Returns:
         (per_case_results, aggregate_scores)
     """
+    # --- Live-mode preflight: RAG corpus integrity check (ADR-011/012/013) ---
+    if live:
+        try:
+            from rag.index_validator import RAGIndexValidator, RAGIndexError
+            validator = RAGIndexValidator()
+            rag_config = validator.validate()
+            print(
+                f"# RAG preflight OK — mode={rag_config.mode}, "
+                f"retriever_kind={rag_config.retriever_kind}, "
+                f"embedding_model={rag_config.embedding_model}, "
+                f"corpus_hash={rag_config.corpus_hash[:24]}..."
+            )
+        except RAGIndexError as exc:
+            raise RuntimeError(
+                f"RAG corpus drift detected before eval start; refusing to proceed.\n"
+                f"  reason: {exc.reason}\n"
+                f"  detail: {exc.detail}\n"
+                "Per ADR-013, rebuild the index and update config/rag_index.yaml."
+            ) from exc
+
     ground_truth_records = _load_ground_truth()
 
     only_cases = os.environ.get("ONLY_CASES", "").strip()
