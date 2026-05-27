@@ -21,6 +21,10 @@ decision_log/
 # Local Chroma index (rebuild via rag/build_chroma_index.py)
 .chroma/
 
+# Physician queue runtime state (regenerated; gitignored like decision_log)
+physician_queue/state.json
+physician_queue/state.json.tmp
+
 # Secrets — never commit
 .env
 .env.*
