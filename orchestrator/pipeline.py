@@ -19,6 +19,7 @@ from gates.admission import admit
 from gates.source_verification import verify
 from gates.ai_decision_limit import check as check_ai_decision_limit, AIDecisionAttemptError
 from gates.denial import check as check_denial, DenialAttemptError
+from gates.confidence import check as check_confidence
 
 from agents.evidence_summarizer import agent as evidence_summarizer
 
@@ -135,6 +136,25 @@ async def _run_async(submission: dict) -> PipelineResult:
         # STEP 5 — Policy Mapper (Agent 3)
         policy_map = await policy_mapper.run(findings, context, case_id)
         check_ai_decision_limit(policy_map, "policy_mapper")
+
+        # STEP 5.5 — Confidence Gate (5th hard control)
+        # Fires BEFORE reasoning_drafter to save the cost of drafting a brief
+        # on a case the system has declared low-confidence. ADR-015.
+        conf_result = check_confidence(policy_map)
+        if not conf_result.passed:
+            _log_escalation(case_id, "confidence_gate_failed", {
+                "signal": conf_result.signal,
+                "ambiguous_or_unmet_count": conf_result.ambiguous_or_unmet_count,
+                "threshold": conf_result.threshold,
+                "violations": conf_result.violations,
+            })
+            return PipelineResult(
+                case_id=case_id,
+                status="escalated",
+                determination=None,
+                escalation_reason=f"confidence_gate_failed: {conf_result.violations}",
+                audit_log_ref=f"decision_log/{case_id}.jsonl"
+            )
 
         # STEP 6 — Reasoning Drafter (Agent 4)
         reasoning_brief = await reasoning_drafter.run(findings, context, policy_map, case_id)
