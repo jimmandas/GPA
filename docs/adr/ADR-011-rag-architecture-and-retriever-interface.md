@@ -1,9 +1,34 @@
 # ADR-011: RAG Architecture and Retriever Interface
 
-**Status:** Accepted (Phase 2 scaffold)
+**Status:** Accepted (interface kept; full RAG initiative DEFERRED to Phase 3 — 2026-05-27)
 **Date:** 2026-05-27
 **Owner:** Jim
 **Phase 2 plan:** `phase-2-agentic-rag-plan.md`
+
+---
+
+## ⚠ Phase 2 Status Update (2026-05-27)
+
+**The RAG initiative is cut from Phase 2 and deferred to Phase 3 in full** (logged in `SCOPE_DELTAS.md` as scope-removal).
+
+**Reason:** A reality-check during Week 12 found that none of the strategy or PRD outcome targets depend on RAG — every OKR2 KR and every governance dim is satisfied by fixture-mode retrieval. The Phase 2 RAG work was architectural completeness for a future production state, not value for this build's nurse-anchored governance proof.
+
+**What stays in this ADR (preserved as a useful pattern):**
+- The `PolicyRetriever` abstract interface
+- `FixtureRetriever` — the active retriever for the GPA build
+- Argument that interface-first design generalizes (defensible regardless of RAG)
+
+**What's deferred to Phase 3:**
+- `ChromaRetriever` (code exists but is NOT exercised in the default eval path)
+- Real parse/chunk/embed pipeline over a real clinical-guidelines corpus
+- pgvector + LlamaIndex migration (formerly in this ADR's "Phase 3 Migration" section — still accurate)
+- Determinism Contract invariants 11-13 (deferred until RAG enters production)
+
+**Status of the Chroma index in this repo:** Built locally for demonstration (1 fixture, 3 criteria embedded with `sentence-transformers/all-MiniLM-L6-v2`). NOT used by the default eval. Kept as proof that the retriever interface generalizes; new corpus + parse pipeline are Phase 3 (logged in `PHASE_3_BACKLOG.md` item #10).
+
+The remaining ADR content below was written assuming RAG would land in Phase 2. Read it for the interface-design rationale; treat all RAG-implementation specifics as forward-looking Phase 3 work.
+
+---
 
 ---
 

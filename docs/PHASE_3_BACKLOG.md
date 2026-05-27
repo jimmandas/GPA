@@ -24,29 +24,37 @@
 
 ## Added after Phase 2 work began
 
-### 10. Vector store migration: Chroma → pgvector (+ LlamaIndex)
+### 10. Full RAG pipeline: parse / chunk / embed / index over a real corpus
 
-- **Date logged:** 2026-05-27
-- **What:** Replace the current `ChromaRetriever` implementation with a `PgvectorRetriever` backed by PostgreSQL + pgvector extension, optionally wrapping a LlamaIndex retrieval pipeline for hybrid (BM25 + vector) retrieval and response synthesis.
-- **Why deferred:**
-  - Phase 2 prioritizes proving the governance model and retriever-interface pattern; Chroma is sufficient for a single-node POC
-  - The `PolicyRetriever` ABC (ADR-011) makes the swap mechanical when the time comes
-  - pgvector earns its place only at production scale where the Postgres ops stack (backup, RBAC, HA, observability) and HIPAA-eligible deployment posture matter
-- **Why it belongs on Phase 3:**
-  - **Production HIPAA story** — pgvector inherits Postgres's HIPAA-eligible deployment story; Chroma's is less established
-  - **Operational maturity** — backup / replication / migrations are standard Postgres tooling
-  - **Hybrid retrieval** — NCCN passage IDs benefit from BM25 + vector together; LlamaIndex provides this out of the box
-  - **Audit defensibility** — at scale, the audit trail is easier to defend against a regulator on a standard RDBMS than on an embedded vector DB
+- **Date logged:** 2026-05-27 (expanded from "Chroma → pgvector migration" after Phase 2 RAG cut)
+- **What:** The actual RAG work the Phase 2 plan envisioned but Phase 2 did NOT deliver:
+  - **Acquire source material** — public-domain clinical-guidelines corpus (NCCN is proprietary; substitutes: CDC clinical guidelines, ASCO consensus statements, USPSTF recommendations)
+  - **PDF / HTML parsing** — PyMuPDF, pdfplumber, or equivalent; extract text + section structure
+  - **Chunking strategy** — semantic chunking by section/passage OR fixed-size-with-overlap; metadata captured per chunk (section ID, page, effective date, guideline version)
+  - **Real embedding** — pinned sentence-transformer or OpenAI embedding snapshot, applied to PARSED chunks (not hand-authored YAML)
+  - **pgvector + LlamaIndex** — Postgres-backed index with hybrid (BM25 + vector) retrieval; replaces the current Chroma demo
+  - **Re-activate Determinism Contract invariants 11, 12, 13** — embedding model pinning, RAG index content-hashing, corpus-update-triggers-rebuild policy
+- **Why this is Phase 3, not Phase 2:**
+  - **No strategy / PRD outcome depends on it.** Documented in Phase 2 deferral decision (2026-05-27 reality-check) — zero OKR2 KRs and zero PRD acceptance criteria require RAG. RAG is architectural completeness for a production future-state, not value for the current nurse-anchored governance proof.
+  - **The actual GPA build's "NCCN corpus" was one hand-authored YAML file with 3 criteria** — even the existing Chroma demo retrieves over hand-structured data, not parsed source documents. Calling that "RAG" was overstated.
+  - **Production HIPAA story belongs with Phase 3 deployment work** — pgvector inherits Postgres's HIPAA-eligible deployment posture; Chroma's is less established. Bundle this with item #2 (Real EHR integration).
+- **What stays in the Phase 2 build** (preserved for Phase 3 to build on):
+  - `PolicyRetriever` ABC (ADR-011)
+  - `FixtureRetriever` (active retriever for the governance proof)
+  - `ChromaRetriever` code + 1-fixture demo index (proof the interface generalizes)
+  - `RAGIndexValidator` preflight (validates fixture-mode hash today; ready for real corpus)
+  - ADRs 011, 012, 013 (Phase 3-deferral addendums applied)
 - **Trigger to prioritize:**
-  - Commitment to a regulated production deployment, OR
-  - Eval dataset / corpus exceeds Chroma's comfortable single-node scale (rough threshold: NCCN corpus > 10k passages OR > 100 concurrent queries), OR
-  - HIPAA-eligible AWS deployment is committed
-- **Migration scope (when activated):**
-  - New `PgvectorRetriever` implementing the existing `PolicyRetriever` ABC
-  - Index build script for pgvector
-  - LlamaIndex wrapper for hybrid retrieval (BM25 + vector + reranking)
-  - Determinism Contract carry-over (invariants 11-13 already designed to be retriever-agnostic)
-  - Migration ADR (next available number, currently 018+)
+  - Commitment to a regulated production deployment (bundles with item #2 Real EHR integration), OR
+  - Strategy OKR3 (Provider Flywheel) work is greenlit and needs richer rationale provenance, OR
+  - A payer / health system stakeholder commits to a pilot with real authorization volume
+- **Migration scope when activated:**
+  - Parser + chunker module (new — `rag/parse.py`, `rag/chunk.py`)
+  - `PgvectorRetriever` (new — replaces `ChromaRetriever`)
+  - LlamaIndex wrapper for hybrid retrieval
+  - Real-corpus build script (replaces `build_chroma_index.py`)
+  - Activate Determinism Contract invariants 11-13
+  - New ADR documenting the full pipeline (likely ADR-019+)
 
 ---
 

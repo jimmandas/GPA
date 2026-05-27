@@ -132,6 +132,25 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 - **Caveat:** Original MVP target per scope §7 was 25-30 cases. We are below that. The build is making a deliberate decision to ship at 15 with a documented limitation rather than chase 25-30 or 50-75. Recommend naming this explicitly in the final eval report.
 - **Where it goes:** `PHASE_3_BACKLOG.md` — bundled with multi-rater labeling at scale (item #4).
 
+### scope-removal: ENTIRE Phase 2 RAG initiative (Week 9 deliverables) — 2026-05-27
+
+- **Date logged:** 2026-05-27
+- **Decision:** User cut from Phase 2 scope after reality-check: *"will RAG move the outcomes in the strategy, and outcomes defined in the PRD forward?"* Answer: no — zero of OKR2's KRs require RAG; only 1 of 12 eval dims is materially affected (and that dim was the rag_passage_relevance dim, which itself gets cut here).
+- **What was named:** Phase 2 plan §"Architecture Changes / Tool Layer" — *"`nccn_passage_lookup` queries pgvector + LlamaIndex over full NCCN corpus … embedding model pinned … index content-hashed … any corpus change requires a rebuild and hash update."* Plus Determinism Contract invariants 11-13.
+- **Why cut:** Honest gap audit found the RAG work was architecturally complete but corpus-ally empty. The repo's "NCCN corpus" is one hand-authored YAML file with 3 criteria. We never built a parse / chunk / embed pipeline over real source documents — what we have is structured-data lookup wearing RAG clothing. Building real RAG (parse PDFs/HTML → chunk → embed → index) would take 4-8 hours AND doesn't move any strategy or PRD outcome forward. The interface generalizes; the corpus pipeline is a Phase 3 investment when production deployment makes it matter.
+- **What stays in the build (NOT cut):**
+  - `PolicyRetriever` ABC (interface pattern; useful regardless of RAG status)
+  - `FixtureRetriever` (the actual active retriever — was always going to be this in Phase 2)
+  - `ChromaRetriever` code + 1-fixture Chroma index on disk (demo proof that the interface generalizes; NOT exercised by default eval)
+  - `RAGIndexValidator` preflight (still validates fixture-mode corpus hash; that part is useful even without RAG)
+  - ADRs 011, 012, 013 (preserved with Phase 3-deferral addendum at the top of each)
+- **What's cut from the build:**
+  - The claim of "RAG built" — replaced with "retriever interface + fixture-mode active, Chroma demo, Phase 3 will do real RAG"
+  - Active enforcement of Determinism Contract invariants 11-13 (deferred until real RAG enters production)
+  - The `rag_passage_relevance` eval dim (removed from `eval/dimensions.py` and its test file; restoration path documented inline)
+  - Any portfolio claim that depends on RAG quality at scale
+- **Where it goes:** `PHASE_3_BACKLOG.md` item #10 (vector store migration → broaden to "real parse/chunk/embed pipeline over a real clinical-guidelines corpus, with pgvector + LlamaIndex").
+
 ### scope-removal: Evidence Lineage Completeness eval dim (Phase 2 Week 12)
 
 - **Date logged:** 2026-05-27

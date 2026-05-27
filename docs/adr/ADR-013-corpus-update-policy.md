@@ -1,8 +1,16 @@
 # ADR-013: Corpus Update Policy
 
-**Status:** Accepted (Phase 2 scaffold)
+**Status:** DEFERRED to Phase 3 (2026-05-27) — written during Phase 2, but RAG was cut from Phase 2 scope before this policy applied to a real corpus. Policy remains valid; activation waits for Phase 3 RAG work.
 **Date:** 2026-05-27
 **Owner:** Jim
+
+---
+
+## ⚠ Phase 2 Status Update (2026-05-27)
+
+This ADR was authored as part of the Phase 2 RAG initiative. RAG was cut from Phase 2 (see ADR-011 status update + `SCOPE_DELTAS.md`). The corpus-update policy below remains the design of record for Phase 3 — no changes — but Determinism Contract invariants 12 ("RAG index content-hashed") and 13 ("corpus update requires rebuild + full eval re-run") are **not currently active** because the default eval doesn't exercise RAG.
+
+The single fixture in `policy/nccn_fixtures/` is hand-authored YAML, not a parsed corpus. Updates to it follow standard prompt-edit discipline (review + version bump + eval re-run), not the corpus-rebuild protocol below.
 
 ---
 

@@ -1,8 +1,16 @@
 # ADR-012: Embedding Model Pinning Strategy
 
-**Status:** Accepted (Phase 2 scaffold)
+**Status:** DEFERRED to Phase 3 (2026-05-27) — written during Phase 2, but RAG was cut from Phase 2 scope before this protocol was exercised against a real corpus. Protocol remains valid; activation waits for Phase 3 RAG work.
 **Date:** 2026-05-27
 **Owner:** Jim
+
+---
+
+## ⚠ Phase 2 Status Update (2026-05-27)
+
+This ADR was authored as part of the Phase 2 RAG initiative. RAG was cut from Phase 2 (see ADR-011 status update + `SCOPE_DELTAS.md`). The embedding-pinning protocol below remains the design of record for Phase 3 — no changes — but Determinism Contract invariant 11 ("embedding model snapshot pinned") is **not currently active** because the default eval doesn't exercise RAG.
+
+The Chroma index in this repo was built with `sentence-transformers/all-MiniLM-L6-v2` as a demonstration; the snapshot string is recorded in `config/rag_index.yaml`. That's documentation of what the demo used, not enforcement against an active production retriever.
 
 ---
 

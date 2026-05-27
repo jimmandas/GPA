@@ -61,12 +61,14 @@ These do NOT move without explicit user approval (and a logged delta in `SCOPE_D
 9. Byte-identical event stream across 5 runs (mod timestamps)
 10. `ClaudeAgentOptions` version-pinned
 
-### Phase 2 extensions (invariants 11-14)
+### Phase 2 extensions (invariants 11-14) — STATUS: deferred
 
-11. Embedding model snapshot pinned (`config/rag_index.yaml`)
-12. RAG index content-hashed
-13. Corpus update requires index rebuild + full eval re-run
-14. EHR stub schemas version-pinned
+| # | Invariant | Status |
+|---|---|---|
+| 11 | Embedding model snapshot pinned | ⚠ deferred (RAG cut from Phase 2) |
+| 12 | RAG index content-hashed | ⚠ partially active (fixture mode hash validated; full RAG deferred) |
+| 13 | Corpus update requires rebuild + eval re-run | ⚠ deferred (no real corpus to rebuild) |
+| 14 | EHR stub schemas version-pinned | ❌ removed (FHIR upgrade cut) |
 
 ### Eval framework
 
@@ -84,9 +86,9 @@ Per `phase-2-agentic-rag-plan.md`:
 
 | Phase 2 Week | Deliverable | Status |
 |---|---|---|
-| 9 | pgvector + LlamaIndex setup | ⚠ **deviation** — built on Chroma (see deltas) |
-| 9 | Embedding model pinning + `RAGIndexValidator` | ✅ done (ADR-012, ADR-013) |
-| 9 | `nccn_passage_lookup` RAG upgrade | ✅ done (ChromaRetriever) |
+| 9 | pgvector + LlamaIndex setup | ❌ **REMOVED 2026-05-27** (entire RAG initiative deferred to Phase 3) |
+| 9 | Embedding model pinning + `RAGIndexValidator` | ⚠ **interface kept, RAG deferred** — ADR-012/013 carry Phase 3-deferral addendums; RAGIndexValidator still validates fixture-mode hash |
+| 9 | `nccn_passage_lookup` RAG upgrade | ❌ **REMOVED 2026-05-27** — `PolicyRetriever` ABC + `FixtureRetriever` are active; `ChromaRetriever` is built but not exercised in default eval |
 | 10 | EHR stub upgrade (FHIR-structured) | ❌ **REMOVED 2026-05-27** (nurse anchor; provider/EHR is Phase 3) |
 | 10 | Tool registry version-pinning | ✅ done (config/tool_registry.yaml) |
 | 10 | Denial Gate routing logic | ✅ done (ADR-014) |
@@ -105,10 +107,11 @@ Per `phase-2-agentic-rag-plan.md`:
 
 | Dimension | Status |
 |---|---|
-| RAG Passage Relevance | ⏳ pending |
+| RAG Passage Relevance | ❌ **REMOVED 2026-05-27** (RAG deferred to Phase 3; dim has no substrate) |
 | Evidence Lineage Completeness | ❌ **REMOVED 2026-05-27** (no substrate after provider track cuts) |
 | Physician Queue Routing Accuracy | ✅ done |
 | Physician Rationale Compliance | ✅ done |
+| Bias Disparity (scope-addition) | ✅ done |
 
 ---
 

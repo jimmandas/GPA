@@ -809,97 +809,13 @@ def score_bias_disparity(cases: list[dict]) -> DimensionScore:
     )
 
 
-# ---------------------------------------------------------------------------
-# 12. RAG Passage Relevance (AGGREGATE) — Phase 2 §12
-# ---------------------------------------------------------------------------
-
-def score_rag_passage_relevance(cases: list[dict]) -> DimensionScore:
-    """
-    Score whether the policy mapper retrieved the NCCN passages the
-    ground truth says are relevant.
-
-    For each case:
-      retrieved = set of passage IDs the policy mapper consulted
-                  (from policy_map.passage_ids_used OR
-                   policy_map.criteria[].nccn_passage_id)
-      expected  = set of passage IDs in ground_truth.expected_criterion_status
-
-      recall = |retrieved ∩ expected| / |expected|
-
-    Aggregate score = mean(recall) across cases with non-empty expected sets.
-
-    Returns N/A if no cases have ground-truth criterion expectations.
-
-    Target: >=0.80
-    """
-    target = ">=0.80"
-    dim = "rag_passage_relevance"
-
-    if not cases:
-        return DimensionScore(
-            dimension=dim, score=None, target=target, passed=None,
-            notes="No cases to evaluate.", is_aggregate=True,
-        )
-
-    per_case_recalls: list[tuple[str, float]] = []
-    misses: list[str] = []
-
-    for c in cases:
-        gt = c.get("ground_truth", {})
-        expected_status = gt.get("expected_criterion_status", {})
-        if not isinstance(expected_status, dict) or not expected_status:
-            continue
-        expected_ids = set(expected_status.keys())
-
-        # Retrieve from pipeline_result if available, else from policy_map dict
-        policy_map = (
-            c.get("pipeline_result", {}).get("policy_map")
-            or c.get("policy_map")
-            or {}
-        )
-        if not isinstance(policy_map, dict):
-            continue
-
-        retrieved_ids: set[str] = set()
-        # Preferred field
-        for pid in policy_map.get("passage_ids_used") or []:
-            if isinstance(pid, str):
-                retrieved_ids.add(pid)
-        # Fallback: scan criteria for nccn_passage_id
-        for crit in policy_map.get("criteria") or []:
-            if isinstance(crit, dict):
-                pid = crit.get("nccn_passage_id") or crit.get("passage_id")
-                if isinstance(pid, str):
-                    retrieved_ids.add(pid)
-
-        intersected = retrieved_ids & expected_ids
-        recall = len(intersected) / len(expected_ids) if expected_ids else 0.0
-        per_case_recalls.append((c.get("case_id", "<unknown>"), recall))
-        if recall < 1.0:
-            missing = expected_ids - retrieved_ids
-            misses.append(f"{c.get('case_id', '?')}: missing {sorted(missing)}")
-
-    if not per_case_recalls:
-        return DimensionScore(
-            dimension=dim, score=None, target=target, passed=None,
-            notes=(
-                "No cases have ground_truth.expected_criterion_status set, OR "
-                "no cases produced a policy_map with retrievable passage_ids."
-            ),
-            is_aggregate=True,
-        )
-
-    mean_recall = sum(r for _, r in per_case_recalls) / len(per_case_recalls)
-    note_parts = [
-        f"Mean recall = {mean_recall:.2f} over {len(per_case_recalls)} cases."
-    ]
-    if misses:
-        note_parts.append(f"Partial retrievals: {misses[:5]}" + (" …" if len(misses) > 5 else ""))
-    return DimensionScore(
-        dimension=dim,
-        score=mean_recall,
-        target=target,
-        passed=mean_recall >= 0.80,
-        notes=" ".join(note_parts),
-        is_aggregate=True,
-    )
+# 12. RAG Passage Relevance — REMOVED 2026-05-27.
+#
+# This dim was added earlier today (Phase 2 §12 deliverable) but cut when
+# the full RAG initiative was deferred to Phase 3. Reasoning: the dim
+# measures retrieval quality against a 1-fixture / 3-criterion corpus,
+# which is not a meaningful measurement. Without real parse/chunk/embed
+# over a real corpus, the dim is self-referential.
+#
+# Restoration path: when Phase 3 builds a real RAG pipeline, restore from
+# git history (commit d75a17f) and rebuild against the production corpus.
