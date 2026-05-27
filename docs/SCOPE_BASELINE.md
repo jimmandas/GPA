@@ -91,7 +91,7 @@ Per `phase-2-agentic-rag-plan.md`:
 | 10 | Tool registry version-pinning | ✅ done (config/tool_registry.yaml) |
 | 10 | Denial Gate routing logic | ✅ done (ADR-014) |
 | 10 | `PhysicianQueueAgent` scaffolded | ✅ done (`physician_queue/`) |
-| 11 | Physician queue UI | ⏳ pending |
+| 11 | Physician queue UI | ✅ done (`ui/physician_queue.html` + `ui/physician_workspace.html` + 3 API endpoints) |
 | 11 | Physician action handlers | ✅ done (`record_action()`) |
 | 11 | Bilateral Logger extension for physician_action | ✅ done (this session) |
 | 11 | `EvidenceLineageBuilder` | ⏳ pending |

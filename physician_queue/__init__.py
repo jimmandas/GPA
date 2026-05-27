@@ -24,6 +24,7 @@ from .queue import (
     QueueState,
     PhysicianAction,
     ActionRecord,
+    get_queue,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "QueueState",
     "PhysicianAction",
     "ActionRecord",
+    "get_queue",
 ]

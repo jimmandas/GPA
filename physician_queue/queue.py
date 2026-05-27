@@ -338,3 +338,26 @@ def _entry_from_dict(d: dict) -> QueueEntry:
         physician_id=d.get("physician_id", ""),
         extra=d.get("extra", {}),
     )
+
+
+# ---------------------------------------------------------------------------
+# Module-level singleton (mirror of logs.bilateral_logger.get_logger pattern)
+# ---------------------------------------------------------------------------
+
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+_DEFAULT_STATE_PATH = _REPO_ROOT / "physician_queue" / "state.json"
+
+_DEFAULT_QUEUE: "FilePhysicianQueue | None" = None
+
+
+def get_queue() -> FilePhysicianQueue:
+    """Return the module-level default FilePhysicianQueue singleton.
+
+    The default state file is `physician_queue/state.json` at the repo root
+    (gitignored). Tests should swap the singleton via monkeypatching
+    `physician_queue.queue._DEFAULT_QUEUE` to a tmp_path-scoped instance.
+    """
+    global _DEFAULT_QUEUE
+    if _DEFAULT_QUEUE is None:
+        _DEFAULT_QUEUE = FilePhysicianQueue(_DEFAULT_STATE_PATH)
+    return _DEFAULT_QUEUE

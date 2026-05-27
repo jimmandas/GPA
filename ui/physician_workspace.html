@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPA v4 · Physician Peer Review</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f6f8;
+      color: #1a1d23;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e2e5ea;
+      padding: 18px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    header .case-meta {
+      font-family: "SF Mono", "Fira Mono", monospace;
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+
+    .role-pill {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: #fef3c7;
+      color: #92400e;
+      vertical-align: middle;
+    }
+
+    a.back-link {
+      font-size: 0.85rem;
+      color: #3b82f6;
+      text-decoration: none;
+    }
+
+    main {
+      padding: 32px;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #e2e5ea;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 18px;
+    }
+
+    .panel h2 {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      margin-bottom: 14px;
+    }
+
+    .kv-grid {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 10px 16px;
+      font-size: 0.9rem;
+    }
+
+    .kv-grid dt { color: #6b7280; }
+    .kv-grid dd { color: #1a1d23; }
+
+    .nurse-note-block, .summary-block {
+      font-size: 0.92rem;
+      color: #374151;
+      line-height: 1.55;
+      background: #fafbfc;
+      border-left: 3px solid #3b82f6;
+      padding: 12px 16px;
+      border-radius: 0 6px 6px 0;
+      margin-top: 6px;
+      white-space: pre-wrap;
+    }
+
+    .ai-tag {
+      display: inline-block;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 2px 8px;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    form.action-form .field {
+      margin-bottom: 14px;
+    }
+
+    form.action-form label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+
+    form.action-form input[type="text"],
+    form.action-form textarea,
+    form.action-form select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: #1a1d23;
+      background: #fff;
+    }
+
+    form.action-form textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .deny-only {
+      display: none;
+    }
+
+    .deny-only.show {
+      display: block;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    button.submit-btn {
+      flex: 1;
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    button.submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button.submit-btn.primary { background: #2563eb; color: #fff; }
+    button.submit-btn.warn    { background: #dc2626; color: #fff; }
+    button.submit-btn.muted   { background: #6b7280; color: #fff; }
+
+    .helper-text {
+      font-size: 0.78rem;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    .feedback {
+      font-size: 0.85rem;
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-top: 14px;
+      display: none;
+    }
+
+    .feedback.success {
+      display: block;
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .feedback.error {
+      display: block;
+      background: #fef2f2;
+      color: #b91c1c;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>GPA v4 · Physician Peer Review <span class="role-pill">PHYSICIAN</span></h1>
+  <a class="back-link" href="physician_queue.html">← Back to queue</a>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>Case</h2>
+    <dl class="kv-grid">
+      <dt>Case ID</dt><dd id="case-id">—</dd>
+      <dt>Routing reason</dt><dd id="reason">—</dd>
+      <dt>State</dt><dd id="state">—</dd>
+      <dt>Enqueued</dt><dd id="enqueued-at">—</dd>
+      <dt>Audit log</dt><dd id="audit-ref">—</dd>
+    </dl>
+  </div>
+
+  <div class="panel">
+    <h2>AI Brief Summary <span class="ai-tag">AI-GENERATED</span></h2>
+    <div class="summary-block" id="summary-block">—</div>
+  </div>
+
+  <div class="panel">
+    <h2>Nurse Note</h2>
+    <div class="nurse-note-block" id="nurse-note-block">—</div>
+  </div>
+
+  <div class="panel">
+    <h2>Record Physician Action</h2>
+    <form class="action-form" id="action-form" onsubmit="return false;">
+      <div class="field">
+        <label for="physician_id">Physician ID</label>
+        <input type="text" id="physician_id" placeholder="dr_smith" required>
+      </div>
+
+      <div class="field">
+        <label for="action">Action</label>
+        <select id="action" required>
+          <option value="approve">Approve (concur with nurse approval)</option>
+          <option value="deny">Deny (requires full rationale)</option>
+          <option value="request_additional_evidence">Request additional evidence (returns to nurse)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="clinical_basis">Clinical Basis</label>
+        <textarea id="clinical_basis" placeholder="State the clinical reasoning grounded in evidence." required></textarea>
+        <div class="helper-text">Required. 20+ characters recommended for compliance.</div>
+      </div>
+
+      <div class="field">
+        <label for="guideline_citation">Guideline Citation</label>
+        <input type="text" id="guideline_citation" placeholder="NCCN-NSCLC-SURV-2" required>
+        <div class="helper-text">Structured citation (e.g., NCCN passage ID).</div>
+      </div>
+
+      <div class="field deny-only" id="evidence-gaps-field">
+        <label for="evidence_gaps">Evidence Gaps (one per line)</label>
+        <textarea id="evidence_gaps" placeholder="Missing initial pathology report&#10;90-day prior CT not confirmed"></textarea>
+        <div class="helper-text">Required for denial. Each line ≥ 10 chars.</div>
+      </div>
+
+      <div class="field">
+        <label for="rationale">Additional Rationale (optional)</label>
+        <textarea id="rationale" placeholder="Optional narrative for the audit log."></textarea>
+      </div>
+
+      <div class="button-row">
+        <button type="button" class="submit-btn primary" id="submit-btn">Record Action</button>
+      </div>
+
+      <div class="feedback" id="feedback"></div>
+    </form>
+  </div>
+</main>
+
+<script>
+  const API_BASE = window.location.origin || "http://localhost:8000";
+
+  const params = new URLSearchParams(window.location.search);
+  const caseId = params.get("case_id");
+
+  if (!caseId) {
+    document.body.innerHTML = `<main><p style="padding:32px;text-align:center;color:#b91c1c;">Missing <code>?case_id=</code> parameter.</p></main>`;
+  }
+
+  async function loadCase() {
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/physician/case/${encodeURIComponent(caseId)}`);
+      if (!r.ok) {
+        if (r.status === 404) {
+          showError(`Case ${caseId} not found in physician queue.`);
+          return;
+        }
+        showError(`HTTP ${r.status}: ${r.statusText}`);
+        return;
+      }
+      const d = await r.json();
+      document.getElementById("case-id").textContent = d.case_id;
+      document.getElementById("reason").textContent = d.reason;
+      document.getElementById("state").textContent = d.state;
+      document.getElementById("enqueued-at").textContent = d.enqueued_at || "—";
+      document.getElementById("audit-ref").textContent = d.audit_log_ref;
+      document.getElementById("summary-block").textContent = d.ai_brief_summary || "(no AI brief summary provided at enqueue time)";
+      document.getElementById("nurse-note-block").textContent = d.nurse_note || "(no nurse note)";
+    } catch (err) {
+      showError(`Network error: ${err}`);
+    }
+  }
+
+  document.getElementById("action").addEventListener("change", (e) => {
+    const gapsField = document.getElementById("evidence-gaps-field");
+    if (e.target.value === "deny") {
+      gapsField.classList.add("show");
+    } else {
+      gapsField.classList.remove("show");
+    }
+  });
+
+  document.getElementById("submit-btn").addEventListener("click", async () => {
+    const physicianId = document.getElementById("physician_id").value.trim();
+    const action = document.getElementById("action").value;
+    const clinicalBasis = document.getElementById("clinical_basis").value.trim();
+    const guidelineCitation = document.getElementById("guideline_citation").value.trim();
+    const evidenceGapsRaw = document.getElementById("evidence_gaps").value.trim();
+    const rationale = document.getElementById("rationale").value.trim();
+
+    if (!physicianId || !clinicalBasis || !guidelineCitation) {
+      showError("Physician ID, clinical basis, and guideline citation are all required.");
+      return;
+    }
+
+    const evidenceGaps = evidenceGapsRaw
+      ? evidenceGapsRaw.split("\n").map(s => s.trim()).filter(Boolean)
+      : [];
+
+    if (action === "deny" && evidenceGaps.length === 0) {
+      showError("Denial requires at least one evidence gap.");
+      return;
+    }
+
+    const body = {
+      case_id: caseId,
+      action,
+      physician_id: physicianId,
+      clinical_basis: clinicalBasis,
+      guideline_citation: guidelineCitation,
+      evidence_gaps: evidenceGaps,
+      rationale,
+    };
+
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true;
+    btn.textContent = "Recording…";
+
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/physician/action`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+      });
+      const result = await r.json();
+      if (!r.ok) {
+        showError(`Action rejected (HTTP ${r.status}): ${result.detail || JSON.stringify(result)}`);
+        btn.disabled = false;
+        btn.textContent = "Record Action";
+        return;
+      }
+      showSuccess(`Action recorded. ${result.action.toUpperCase()} by ${result.physician_id} at ${result.recorded_at}. Queue state → ${result.queue_state_after}.`);
+      btn.textContent = "Recorded ✓";
+    } catch (err) {
+      showError(`Network error: ${err}`);
+      btn.disabled = false;
+      btn.textContent = "Record Action";
+    }
+  });
+
+  function showError(msg) {
+    const fb = document.getElementById("feedback");
+    fb.className = "feedback error";
+    fb.textContent = msg;
+  }
+
+  function showSuccess(msg) {
+    const fb = document.getElementById("feedback");
+    fb.className = "feedback success";
+    fb.textContent = msg;
+  }
+
+  if (caseId) loadCase();
+</script>
+
+</body>
+</html>
