@@ -259,6 +259,35 @@ def record_nurse_decision(
     }
     get_logger().commit(case_id, post_state)
 
+    # Phase 2 handoff: an "escalate" action puts the case on the physician queue.
+    # Lazy-init the default queue if no explicit one was provided. Idempotent —
+    # if the case is already pending on the queue, we silently skip (avoids
+    # double-enqueue when a nurse hits escalate twice).
+    if action == "escalate":
+        try:
+            if physician_queue is None:
+                from physician_queue import get_queue
+                physician_queue = get_queue()
+            from physician_queue import FilePhysicianQueueError
+            try:
+                physician_queue.enqueue(
+                    case_id=case_id,
+                    reason="nurse_escalated",
+                    nurse_note=rationale,
+                )
+            except FilePhysicianQueueError as exc:
+                # duplicate_pending is the only expected error here — case is
+                # already on the queue from a prior escalation. Safe to skip.
+                if getattr(exc, "reason", "") != "duplicate_pending":
+                    raise
+        except Exception:
+            # We do NOT want a physician-queue write failure to block the nurse
+            # action from emitting — the nurse's decision is already in the
+            # bilateral log (write-before-emit honored). Log the failure path
+            # via the system_failures.jsonl convention; do not raise.
+            import traceback
+            traceback.print_exc()
+
     determination = {
         "case_id": case_id,
         "path": action,

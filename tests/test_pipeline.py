@@ -147,6 +147,68 @@ def test_record_nurse_decision_deny_raises(monkeypatch, tmp_path):
         record_nurse_decision("case_test", "deny", "Not covered.")
 
 
+def test_record_nurse_decision_escalate_enqueues_to_physician_queue(monkeypatch, tmp_path):
+    """
+    Phase 2 handoff: nurse escalate action MUST place the case on the physician queue
+    so the physician workflow has visible work.
+    """
+    from physician_queue.queue import FilePhysicianQueue
+    from physician_queue import queue as queue_mod
+
+    _patch_logger(monkeypatch, tmp_path)
+
+    # Swap the default physician queue singleton to a tmp instance
+    tmp_queue = FilePhysicianQueue(tmp_path / "phys_state.json")
+    monkeypatch.setattr(queue_mod, "_DEFAULT_QUEUE", tmp_queue)
+
+    case_id = "case_escalation_test"
+    result = record_nurse_decision(
+        case_id,
+        "escalate",
+        "Patient comorbidities make this judgment-intensive; needs physician review.",
+    )
+    assert result.status == "completed"
+    assert result.determination["path"] == "escalate"
+
+    # The case should now be on the physician queue
+    entry = tmp_queue.get(case_id)
+    assert entry is not None, "escalate must enqueue to physician queue"
+    assert entry.reason == "nurse_escalated"
+    assert "comorbidities" in entry.nurse_note
+
+
+def test_record_nurse_decision_escalate_is_idempotent(monkeypatch, tmp_path):
+    """Re-clicking escalate (double-submit) must not raise duplicate_pending."""
+    from physician_queue.queue import FilePhysicianQueue
+    from physician_queue import queue as queue_mod
+
+    _patch_logger(monkeypatch, tmp_path)
+    tmp_queue = FilePhysicianQueue(tmp_path / "phys_state.json")
+    monkeypatch.setattr(queue_mod, "_DEFAULT_QUEUE", tmp_queue)
+
+    case_id = "case_double_escalate"
+    record_nurse_decision(case_id, "escalate", "first")
+    # Second call must not raise — silently no-op on the queue
+    result = record_nurse_decision(case_id, "escalate", "second")
+    assert result.status == "completed"
+
+
+def test_record_nurse_decision_approve_does_not_enqueue(monkeypatch, tmp_path):
+    """approve / pend must NOT touch the physician queue."""
+    from physician_queue.queue import FilePhysicianQueue
+    from physician_queue import queue as queue_mod
+
+    _patch_logger(monkeypatch, tmp_path)
+    tmp_queue = FilePhysicianQueue(tmp_path / "phys_state.json")
+    monkeypatch.setattr(queue_mod, "_DEFAULT_QUEUE", tmp_queue)
+
+    record_nurse_decision("case_approved", "approve", "All criteria met.")
+    record_nurse_decision("case_pended", "pend", "Awaiting additional records.")
+
+    assert tmp_queue.get("case_approved") is None
+    assert tmp_queue.get("case_pended") is None
+
+
 def test_record_nurse_decision_deny_with_physician_queue(monkeypatch, tmp_path):
     """
     Route mode: denial is permitted when a PhysicianQueue has a recorded DENY action.
