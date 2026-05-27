@@ -18,6 +18,9 @@ venv/
 # Runtime audit logs (regenerated on every eval run)
 decision_log/
 
+# Local Chroma index (rebuild via rag/build_chroma_index.py)
+.chroma/
+
 # Secrets — never commit
 .env
 .env.*

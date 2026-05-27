@@ -145,17 +145,28 @@ _AGENT_OPTIONS = ClaudeAgentOptions(
     allowed_tools=[],
 )
 
-# Phase 2 retriever interface. Default is FixtureRetriever; future code
-# will swap in PgvectorRetriever / ChromaRetriever via the same interface.
+# Phase 2 retriever interface. Default is FixtureRetriever; ChromaRetriever
+# activates via RAG_RETRIEVER=chroma env var. Future implementations
+# (pgvector, lancedb) drop into the same dispatch.
 # See ADR-011 for the contract and rationale.
 _retriever: PolicyRetriever | None = None
 
 
 def _get_retriever() -> PolicyRetriever:
-    """Lazy-init the policy retriever. Defaults to FixtureRetriever."""
+    """
+    Lazy-init the policy retriever based on RAG_RETRIEVER env var.
+
+      RAG_RETRIEVER=chroma  → ChromaRetriever (real vector store)
+      default               → FixtureRetriever (YAML file lookup)
+    """
     global _retriever
     if _retriever is None:
-        _retriever = FixtureRetriever(_NCCN_FIXTURES_DIR)
+        kind = os.environ.get("RAG_RETRIEVER", "fixture").lower()
+        if kind == "chroma":
+            from rag.chroma_retriever import ChromaRetriever
+            _retriever = ChromaRetriever()
+        else:
+            _retriever = FixtureRetriever(_NCCN_FIXTURES_DIR)
     return _retriever
 
 
@@ -163,6 +174,12 @@ def set_retriever(retriever: PolicyRetriever) -> None:
     """Injection hook for tests and for Phase 2 real-retriever swap."""
     global _retriever
     _retriever = retriever
+
+
+def reset_retriever() -> None:
+    """Reset the retriever singleton; next call to _get_retriever() re-reads env."""
+    global _retriever
+    _retriever = None
 
 
 # v3 SDK choice: env-var-gated. See ADR-010.
