@@ -10,6 +10,10 @@ Per scope §7, eval has two layers:
   - AGGREGATE dimensions: adversarial_gate_bypass_rate, false_escalation_rate,
     confidence_calibration, cohens_kappa.
 
+All evals run on Sonnet (hardcoded below). Production stays on the model
+configured in config/model.yaml (Opus). This split lets eval iteration be
+fast and cheap without disturbing the production canonical config.
+
 Usage:
     PYTHONPATH=. python eval/runner.py                    # unit mode
     SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py  # full live run
@@ -17,8 +21,12 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import os
+# Hardcode Sonnet for ALL eval runs. Must come before any agent import,
+# because agents call _load_model_snapshot() at module-load time.
+os.environ["MODEL_SNAPSHOT_OVERRIDE"] = "claude-sonnet-4-5-20250929"
+
+import json
 import pathlib
 from dataclasses import dataclass
 from datetime import datetime, timezone

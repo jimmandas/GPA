@@ -1,3 +1,5 @@
 model_snapshot: "claude-opus-4-1-20250805"
 version: "1"
 # Changing model_snapshot requires version bump and full eval re-run.
+# Production canonical config. Evals hardcode Sonnet via MODEL_SNAPSHOT_OVERRIDE
+# env var (set in eval/runner.py) — that override does NOT alter this file.

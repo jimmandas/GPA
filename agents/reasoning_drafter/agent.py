@@ -15,6 +15,7 @@ Module-level initialization (runs at import):
 import asyncio
 import hashlib
 import json
+import os
 import pathlib
 from datetime import datetime, timezone
 
@@ -61,6 +62,11 @@ class PromptHashMismatchError(Exception):
 # ---------------------------------------------------------------------------
 
 def _load_model_snapshot() -> str:
+    # Env var override lets eval/runner.py swap models for eval-only runs
+    # without editing model.yaml (the production canonical config).
+    override = os.environ.get("MODEL_SNAPSHOT_OVERRIDE")
+    if override:
+        return override
     with _MODEL_YAML_FILE.open("r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     return cfg["model_snapshot"]
