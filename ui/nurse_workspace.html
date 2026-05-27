@@ -808,7 +808,7 @@ async function submitDecision(caseId, action) {
   setButtons(false);
 
   try {
-    const res = await fetch("/api/v1/pa/nurse-decision", {
+    const res = await fetch(`${API_BASE}/api/v1/pa/nurse-decision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ case_id: caseId, action, rationale })
