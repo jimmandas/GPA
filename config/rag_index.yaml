@@ -1,0 +1,42 @@
+# GPA v4 Phase 2 — RAG index registry.
+#
+# Records the expected state of the retrieval corpus. The RAGIndexValidator
+# (rag/index_validator.py) enforces this at the start of every eval run
+# per Determinism Contract invariants 11-13:
+#
+#   11. Embedding model snapshot pinned (this file)
+#   12. RAG index content-hashed (this file)
+#   13. Corpus update requires index rebuild + full eval re-run
+#
+# This is the v0 of the file. We're still in "fixture mode" — the corpus
+# is the NCCN YAML fixtures and the retriever is FixtureRetriever (no
+# embeddings, no vector store). When we wire in pgvector/Chroma, the
+# embedding_model + retriever_kind flip to real values and corpus_hash
+# tracks the indexed corpus rather than the raw YAML files.
+
+version: "0.1-fixture-mode"
+
+# Retriever in use today.
+# Future values: "pgvector" | "chroma" | "lancedb"
+retriever_kind: "fixture"
+
+# Embedding model snapshot. "none-fixture-mode" because the FixtureRetriever
+# does not produce embeddings. Phase 2 real values would look like:
+#   "text-embedding-3-large-20250101" (OpenAI)
+#   "voyage-3-20250115"               (Voyage)
+#   "Snowflake/arctic-embed-l-v2.0"   (local sentence-transformers)
+embedding_model: "none-fixture-mode"
+
+# SHA-256 over the corpus contents.
+# Computed by rag.index_validator.compute_corpus_hash(corpus_dir).
+# Any change to the files under corpus_path flips this hash and the
+# RAGIndexValidator fails the next eval run until this file is updated.
+corpus_hash: "sha256:e607a817c1517ae017f9457bf231f1c708de990b7d15a38bf3d318ac84297678"
+
+# Path to the corpus, relative to repo root.
+corpus_path: "policy/nccn_fixtures"
+
+notes: |
+  v0.1 fixture-mode baseline. Locked in 2026-05-27 when the RAG retriever
+  interface was scaffolded (Phase 2 Week 9 first piece). To replace with a
+  real vector store, see ADR-011.

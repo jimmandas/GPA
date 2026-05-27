@@ -34,6 +34,7 @@ from claude_agent_sdk import ClaudeAgentOptions, query
 from .schema_validator import validate_policy_map
 from .aggregate import aggregate_overall_signal
 from logs.bilateral_logger import get_logger, BilateralLoggerError
+from rag.retriever import FixtureRetriever, PolicyRetriever
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -143,6 +144,26 @@ _AGENT_OPTIONS = ClaudeAgentOptions(
     max_turns=1,
     allowed_tools=[],
 )
+
+# Phase 2 retriever interface. Default is FixtureRetriever; future code
+# will swap in PgvectorRetriever / ChromaRetriever via the same interface.
+# See ADR-011 for the contract and rationale.
+_retriever: PolicyRetriever | None = None
+
+
+def _get_retriever() -> PolicyRetriever:
+    """Lazy-init the policy retriever. Defaults to FixtureRetriever."""
+    global _retriever
+    if _retriever is None:
+        _retriever = FixtureRetriever(_NCCN_FIXTURES_DIR)
+    return _retriever
+
+
+def set_retriever(retriever: PolicyRetriever) -> None:
+    """Injection hook for tests and for Phase 2 real-retriever swap."""
+    global _retriever
+    _retriever = retriever
+
 
 # v3 SDK choice: env-var-gated. See ADR-010.
 _USE_ANTHROPIC_DIRECT = (
@@ -272,15 +293,24 @@ async def run(findings: dict, context: dict, case_id: str) -> dict:
     fixture_key = f"{indication_category}_{modality}"
     fixture_path = _NCCN_FIXTURES_DIR / f"{fixture_key}.yaml"
 
-    # --- Call tool directly and verify fixture hash -------------------------
+    # --- Verify fixture hash (defense-in-depth alongside RAGIndexValidator) ---
     fixture_hash: str | None = None
     if fixture_path.exists():
         fixture_hash = _verify_fixture_hash("nccn_passage_lookup", fixture_key, fixture_path)
-    nccn_data_str = nccn_passage_lookup(indication_category, modality)
+
+    # --- Retrieve via the PolicyRetriever interface (Phase 2 ready) ----------
+    # The retriever is set up to use FixtureRetriever today; a real RAG
+    # implementation (PgvectorRetriever / ChromaRetriever / ...) drops into
+    # the same interface without changing this code. See ADR-011.
+    retriever: PolicyRetriever = _get_retriever()
+    corpus = retriever.retrieve(indication_category, modality)
+    nccn_passages = corpus.to_payload_dict()
     tool_calls_made = [{
         "name": "nccn_passage_lookup",
         "input": {"indication_category": indication_category, "modality": modality},
         "fixture_hash": fixture_hash,
+        "retriever_kind": corpus.retriever_kind,
+        "corpus_content_hash": corpus.content_hash,
     }]
 
     # --- Build prompt with pre-fetched NCCN passages ------------------------
@@ -289,7 +319,7 @@ async def run(findings: dict, context: dict, case_id: str) -> dict:
             "case_id": case_id,
             "indication_category": indication_category,
             "modality": modality,
-            "nccn_passages": json.loads(nccn_data_str),
+            "nccn_passages": nccn_passages,
             "submission_evidence": {
                 "imaging_request": {
                     "indication_text": findings.get("raw_quotes", []),
