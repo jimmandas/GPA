@@ -5,20 +5,31 @@ written for the "governed agentic workflows" pattern: every agent call is
 hashed, every decision is logged write-before-emit, and a per-dimension eval
 harness measures the system end-to-end.
 
+**Status (2026-05-27):** Phase 2 MVP — nurse-anchored governance proof. 5 hard
+control gates (admission, source_verification, ai_decision_limit, denial,
+confidence), end-to-end physician peer-review workflow, 11 active eval dims,
+EVAL_TIER system (dev/Sonnet vs ship/Opus), scope baseline + delta log.
+
 ## What's in the box
 
 | Path | What it is |
 |---|---|
 | `agents/` | The four pipeline agents: evidence_summarizer, context_retriever, policy_mapper, reasoning_drafter |
-| `orchestrator/pipeline.py` | Sequentially coordinates the four agents + the four gates |
-| `gates/` | admission, source_verification, ai_decision_limit, denial |
-| `logs/bilateral_logger.py` | Write-before-emit audit log |
-| `eval/` | Eval harness — 8 dimensions over ground-truth cases |
-| `api/main.py` | FastAPI app exposing the pipeline as HTTP endpoints |
-| `ui/*.html` | Static review UI (audit log, queue, nurse workspace) |
+| `orchestrator/pipeline.py` | Sequentially coordinates the four agents + the **five** gates |
+| `gates/` | admission, source_verification, ai_decision_limit, denial, **confidence (new Phase 2)** |
+| `physician_queue/` | **(Phase 2)** PhysicianQueue ABC + FilePhysicianQueue + ActionRecord for peer review workflow |
+| `rag/` | PolicyRetriever ABC + FixtureRetriever (active). Real RAG pipeline is Phase 3 — see `docs/PHASE_3_BACKLOG.md` item #10 |
+| `logs/bilateral_logger.py` | Write-before-emit audit log (now also receives `physician_action_record` events) |
+| `eval/` | Eval harness — **11 dimensions** + ConfidenceCalibrator + EVAL_TIER system (see `docs/eval-methodology.md`) |
+| `api/main.py` | FastAPI app — pipeline endpoints, nurse queue/case endpoints, audit endpoints, physician queue/action endpoints |
+| `ui/*.html` | Static review UI: `queue.html` (nurse queue), `nurse_workspace.html`, `physician_queue.html`, `physician_workspace.html`, `index.html` (audit viewer). All wired to live API |
 | `prompts/` | System prompts for each agent (hash-pinned in `config/prompt_hashes.yaml`) |
 | `schemas/` | JSON schemas every agent output is validated against |
 | `tools/fixtures/` | Test data (submissions, patient records, prior imaging) |
+| `docs/SCOPE_BASELINE.md` | The Phase 2 deliverable status + hard invariants + ADR registry |
+| `docs/SCOPE_DELTAS.md` | Running log of approved scope additions / removals / clarifications |
+| `docs/PHASE_3_BACKLOG.md` | Items deferred beyond Phase 2 with explicit trigger conditions |
+| `docs/adr/` | 19 ADRs (000–018) covering every architectural decision |
 
 ## One-time setup
 
@@ -72,18 +83,33 @@ SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py
 
 The `PYTHONPATH=.` is required — without it the module imports fail.
 
-Output is a markdown report printed to stdout. The 8 dimensions:
+Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. The **11 active dimensions** (see `docs/eval-methodology.md` for full reference):
 
 | # | Dimension | Layer | Target |
 |---|---|---|---|
 | 1 | source_citation_accuracy | per-case | >=0.90 |
 | 2 | ai_decision_limit | per-case | ==1.00 |
-| 3 | rationale_faithfulness | per-case (LLM judge, GPT-4o — different vendor) | >=0.80 |
+| 3 | rationale_faithfulness | per-case (LLM judge: GPT-4o snapshot `gpt-4o-2024-11-20`) | >=0.80 |
 | 4 | decision_reproducibility | per-case (5× runs) | >=0.80 |
 | 5 | adversarial_gate_bypass_rate | aggregate | ==0.00 |
 | 6 | false_escalation_rate | aggregate | <0.35 |
 | 7 | confidence_calibration | aggregate (Brier) | <0.15 |
 | 8 | cohens_kappa | aggregate (needs co-labels) | >=0.60 |
+| 9 | physician_queue_routing_accuracy | aggregate (Phase 2 §12) | >=0.80 |
+| 10 | physician_rationale_compliance | aggregate (Phase 2 §12) | >=0.95 |
+| 11 | bias_disparity | aggregate (ADR-018 scope-addition) | max spread <0.20 |
+
+**Eval tiers** (ADR-017):
+
+```bash
+# Dev tier (default): Sonnet 4.5, ~50-80 min — fast iteration, dev signal only
+EVAL_TIER=dev SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/save_report.py
+
+# Ship tier: Opus 4.1 from model.yaml, ~90-120 min — audit-grade, production-fidelity
+EVAL_TIER=ship SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/save_report.py
+```
+
+Always use `eval/save_report.py` (not `eval/runner.py` directly) so the report file lands on disk.
 
 **Faithfulness judge requires OpenAI** — per scope §7, the judge must use a different vendor than the agents (avoid self-grading bias). Set `OPENAI_API_KEY` in `.env`. Without it, the dimension reports N/A with a clear note.
 

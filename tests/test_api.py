@@ -161,6 +161,50 @@ def test_nurse_decision_rejects_whitespace_rationale():
 
 
 # ---------------------------------------------------------------------------
+# Nurse queue + audit endpoints (Loom-readiness, 2026-05-27)
+# ---------------------------------------------------------------------------
+
+def test_nurse_queue_lists_case_fixtures():
+    response = client.get("/api/v1/nurse/queue")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total" in data
+    assert "cases" in data
+    assert data["total"] >= 1
+    case_ids = [c["case_id"] for c in data["cases"]]
+    assert "case_0001" in case_ids
+
+
+def test_nurse_case_returns_submission_for_known_fixture():
+    response = client.get("/api/v1/nurse/case/case_0001")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["case_id"] == "case_0001"
+    assert "submission" in data
+    assert data["submission"]["case_id"] == "case_0001"
+    assert "audit_log_ref" in data
+
+
+def test_nurse_case_404_for_unknown_case():
+    response = client.get("/api/v1/nurse/case/case_does_not_exist")
+    assert response.status_code == 404
+
+
+def test_audit_cases_lists_logs():
+    response = client.get("/api/v1/audit/cases")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total" in data
+    assert "cases" in data
+    # decision_log/ holds many fixture logs from prior eval runs
+
+
+def test_audit_case_404_for_unknown_case():
+    response = client.get("/api/v1/audit/case/case_truly_does_not_exist_xyz123")
+    assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
 # Physician peer review endpoints (Phase 2 Week 11)
 # ---------------------------------------------------------------------------
 
