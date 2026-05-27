@@ -1,57 +1,21 @@
-# GPA v4 Phase 2 — RAG index registry (multi-mode).
+# GPA — retrieval config (Phase 2: fixture-only).
 #
-# Records the expected state of every supported retrieval mode. The
-# RAGIndexValidator (rag/index_validator.py) reads RAG_RETRIEVER from
-# the environment, picks the matching mode block below, and enforces
-# Determinism Contract invariants 11-13 against THAT block:
+# The full RAG initiative was cut from Phase 2 on 2026-05-27 (see
+# docs/SCOPE_DELTAS.md). What remains is the fixture-mode retriever
+# the policy mapper actually uses. Fixture integrity is enforced via
+# config/tool_registry.yaml (Determinism Contract invariant 4), NOT
+# via the removed RAGIndexValidator.
 #
-#   11. Embedding model snapshot pinned (per mode)
-#   12. RAG index content-hashed (per mode)
-#   13. Corpus update requires index rebuild + full eval re-run
-#
-# If RAG_RETRIEVER is not set, the active_mode below is used.
-#
-# To add a new retriever (pgvector, lancedb, ...): add a new mode block
-# with retriever_kind / embedding_model / corpus_hash / corpus_path,
-# then update the validator's dispatch if the new mode needs a different
-# hash-validation strategy.
+# Phase 3 will rebuild this with multi-mode dispatch (pgvector +
+# LlamaIndex) once a real parse/chunk/embed pipeline is needed.
+# See PHASE_3_BACKLOG.md item #10.
 
-version: "0.2-multi-mode"
+version: "0.3-fixture-only-post-rag-cut"
 
-# Default mode when RAG_RETRIEVER env var is unset.
-active_mode: "fixture"
-
-modes:
-
-  fixture:
-    # File-system YAML lookup. Corpus hash is SHA-256 over every file in
-    # corpus_path (sorted, content-delimited). Validator recomputes on
-    # every eval run; mismatch = drift = fail fast.
-    retriever_kind: "fixture"
-    embedding_model: "none-fixture-mode"
-    corpus_path: "policy/nccn_fixtures"
-    corpus_hash: "sha256:e607a817c1517ae017f9457bf231f1c708de990b7d15a38bf3d318ac84297678"
-    hash_strategy: "directory_files"
-    notes: |
-      v0.1 fixture-mode baseline. Locked 2026-05-27.
-
-  chroma:
-    # Embedded vector store backed by sentence-transformers/all-MiniLM-L6-v2.
-    # The corpus_hash is computed over the CANONICAL DOCUMENT SET (sorted
-    # by id, with metadata) produced by rag/build_chroma_index.py — not
-    # over the .chroma directory itself (which contains timestamped sqlite
-    # files that change on every rebuild).
-    # corpus_path here points at the SOURCE corpus (NCCN YAML) so the
-    # validator can recompute the canonical document hash from source and
-    # catch the case where someone edited a YAML and forgot to rebuild.
-    retriever_kind: "chroma"
-    embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
-    corpus_path: "policy/nccn_fixtures"
-    corpus_hash: "sha256:ee8ce07bd3ca83d19c4c87fb218b1a72fcfa1a3e7d0d28c2e23f1ae32852c444"
-    hash_strategy: "canonical_documents"
-    chroma_persist_path: ".chroma"
-    chroma_collection_name: "nccn_criteria"
-    notes: |
-      v0.1 chroma baseline. Index built 2026-05-27 from 3 criteria across
-      1 fixture (post_treatment_surveillance_CT.yaml). To rebuild:
-      `PYTHONPATH=. python rag/build_chroma_index.py`.
+retriever_kind: "fixture"
+corpus_path: "policy/nccn_fixtures"
+notes: |
+  v0.3 (2026-05-27): Stripped to fixture-mode only after Phase 2 RAG cut.
+  The retriever interface (rag/retriever.py) is the durable architectural
+  pattern; the Chroma demo and RAGIndexValidator were removed because they
+  added complexity without serving a real corpus.

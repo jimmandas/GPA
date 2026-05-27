@@ -150,28 +150,17 @@ _AGENT_OPTIONS = ClaudeAgentOptions(
     allowed_tools=[],
 )
 
-# Phase 2 retriever interface. Default is FixtureRetriever; ChromaRetriever
-# activates via RAG_RETRIEVER=chroma env var. Future implementations
-# (pgvector, lancedb) drop into the same dispatch.
-# See ADR-011 for the contract and rationale.
+# Retriever interface (ADR-011). FixtureRetriever is the active impl.
+# Phase 3 will add a real RAG retriever (parse / chunk / embed over a real
+# corpus + pgvector + LlamaIndex per PHASE_3_BACKLOG.md item #10).
 _retriever: PolicyRetriever | None = None
 
 
 def _get_retriever() -> PolicyRetriever:
-    """
-    Lazy-init the policy retriever based on RAG_RETRIEVER env var.
-
-      RAG_RETRIEVER=chroma  → ChromaRetriever (real vector store)
-      default               → FixtureRetriever (YAML file lookup)
-    """
+    """Lazy-init the FixtureRetriever (the active retriever in Phase 2)."""
     global _retriever
     if _retriever is None:
-        kind = os.environ.get("RAG_RETRIEVER", "fixture").lower()
-        if kind == "chroma":
-            from rag.chroma_retriever import ChromaRetriever
-            _retriever = ChromaRetriever()
-        else:
-            _retriever = FixtureRetriever(_NCCN_FIXTURES_DIR)
+        _retriever = FixtureRetriever(_NCCN_FIXTURES_DIR)
     return _retriever
 
 

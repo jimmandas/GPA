@@ -132,6 +132,29 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 - **Caveat:** Original MVP target per scope §7 was 25-30 cases. We are below that. The build is making a deliberate decision to ship at 15 with a documented limitation rather than chase 25-30 or 50-75. Recommend naming this explicitly in the final eval report.
 - **Where it goes:** `PHASE_3_BACKLOG.md` — bundled with multi-rater labeling at scale (item #4).
 
+### scope-removal: Chroma + RAGIndexValidator code (2026-05-27, follow-up to RAG cut)
+
+- **Date logged:** 2026-05-27
+- **Decision:** User cut after asking "do we need chroma or ragindexvalidator?" Answer was no.
+- **What was named:** Phase 2 plan §"Tool Layer" / "Architecture Changes" — Chroma as the concrete retriever implementation; `RAGIndexValidator` as a build-time preflight check enforcing Determinism Contract invariants 11-13.
+- **What's removed:**
+  - `rag/chroma_retriever.py` (159 lines)
+  - `rag/build_chroma_index.py` (132 lines, standalone indexer script)
+  - `rag/index_validator.py` (322 lines)
+  - `tests/rag/test_chroma_retriever.py` (119 lines)
+  - `tests/rag/test_index_validator.py` (295 lines)
+  - `.chroma/` directory (208 KB sqlite + collection data)
+  - Multi-mode dispatch in `agents/policy_mapper/agent.py`
+  - Preflight call in `eval/runner.py`
+  - Multi-mode block in `config/rag_index.yaml` (now fixture-only)
+- **Why:**
+  - Chroma indexed 1 fixture / 3 criteria — not a corpus
+  - RAGIndexValidator was multi-mode for fixture/chroma/pgvector; with only fixture mode active, it's overkill
+  - Fixture integrity is already enforced by `config/tool_registry.yaml` (Determinism Contract invariant 4) — separate, simpler mechanism
+  - Phase 3 RAG will likely use pgvector + LlamaIndex, NOT Chroma — keeping Chroma artifacts creates "we have RAG (sort of)" ambiguity
+- **What stays:** `PolicyRetriever` ABC (ADR-011 interface pattern) + `FixtureRetriever` + `tests/rag/test_retriever.py`. These are the active pieces; they exercise the interface and serve the real pipeline.
+- **Net effect:** ~1,030 lines of code + tests removed. The "we don't have RAG" narrative is now also "we don't have demo Chroma either" — cleaner and more honest.
+
 ### scope-removal: ENTIRE Phase 2 RAG initiative (Week 9 deliverables) — 2026-05-27
 
 - **Date logged:** 2026-05-27

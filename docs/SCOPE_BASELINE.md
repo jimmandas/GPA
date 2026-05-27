@@ -87,8 +87,8 @@ Per `phase-2-agentic-rag-plan.md`:
 | Phase 2 Week | Deliverable | Status |
 |---|---|---|
 | 9 | pgvector + LlamaIndex setup | ❌ **REMOVED 2026-05-27** (entire RAG initiative deferred to Phase 3) |
-| 9 | Embedding model pinning + `RAGIndexValidator` | ⚠ **interface kept, RAG deferred** — ADR-012/013 carry Phase 3-deferral addendums; RAGIndexValidator still validates fixture-mode hash |
-| 9 | `nccn_passage_lookup` RAG upgrade | ❌ **REMOVED 2026-05-27** — `PolicyRetriever` ABC + `FixtureRetriever` are active; `ChromaRetriever` is built but not exercised in default eval |
+| 9 | Embedding model pinning + `RAGIndexValidator` | ❌ **REMOVED 2026-05-27** — RAGIndexValidator code deleted (redundant with tool_registry hashing); ADR-012/013 carry Phase 3-deferral addendums |
+| 9 | `nccn_passage_lookup` RAG upgrade | ❌ **REMOVED 2026-05-27** — `PolicyRetriever` ABC + `FixtureRetriever` are active; ChromaRetriever code deleted |
 | 10 | EHR stub upgrade (FHIR-structured) | ❌ **REMOVED 2026-05-27** (nurse anchor; provider/EHR is Phase 3) |
 | 10 | Tool registry version-pinning | ✅ done (config/tool_registry.yaml) |
 | 10 | Denial Gate routing logic | ✅ done (ADR-014) |
