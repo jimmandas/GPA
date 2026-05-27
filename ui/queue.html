@@ -176,31 +176,13 @@
 </main>
 
 <script>
-  const CASES = [
-    {
-      case_id: "case_0001",
-      patient_id: "pt_anon_0001",
-      submitted_at: "2026-05-25T14:02:11Z",
-      indication_category: "post_treatment_surveillance",
-      modality: "CT",
-      body_region: "chest",
-      status: "pending_review"
-    },
-    {
-      case_id: "case_0002",
-      patient_id: "pt_anon_0002",
-      submitted_at: "2026-05-25T09:15:00Z",
-      indication_category: "post_treatment_surveillance",
-      modality: "CT",
-      body_region: "chest",
-      status: "pending_review"
-    }
-  ];
-
+  const API_BASE = window.location.origin || "http://localhost:8000";
   const CLICKABLE_STATUSES = new Set(["pending_review"]);
 
   function formatDateTime(iso) {
+    if (!iso) return "—";
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
     return d.toLocaleString("en-US", {
       month: "short", day: "numeric", year: "numeric",
       hour: "2-digit", minute: "2-digit", hour12: true,
@@ -209,42 +191,58 @@
   }
 
   function formatIndication(raw) {
-    return raw.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    if (!raw) return "—";
+    return String(raw).replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   }
 
-  function render() {
-    const sorted = [...CASES].sort(
-      (a, b) => new Date(a.submitted_at) - new Date(b.submitted_at)
-    );
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[ch]);
+  }
 
+  async function loadQueue() {
     const tbody = document.getElementById("case-table-body");
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Loading…</td></tr>`;
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/nurse/queue`);
+      if (!res.ok) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">HTTP ${res.status}: ${res.statusText}</td></tr>`;
+        return;
+      }
+      const data = await res.json();
+      const cases = data.cases || [];
+      cases.sort((a, b) => new Date(a.submitted_at || 0) - new Date(b.submitted_at || 0));
 
-    if (sorted.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No cases in queue.</td></tr>`;
-      return;
+      if (cases.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No cases in queue.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = cases.map(c => {
+        const isClickable = CLICKABLE_STATUSES.has(c.status);
+        const rowClass = isClickable ? "clickable" : "inactive";
+        const onClick = isClickable
+          ? `onclick="window.location.href='nurse_workspace.html?case_id=${encodeURIComponent(c.case_id)}'"` : "";
+        const arrow = isClickable ? `<span class="arrow-icon">→</span>` : "";
+
+        return `
+          <tr class="${rowClass}" ${onClick}>
+            <td><span class="case-id">${escapeHtml(c.case_id)}</span>${arrow}</td>
+            <td><span class="patient-id">${escapeHtml(c.patient_id || "—")}</span></td>
+            <td class="time-cell">${escapeHtml(formatDateTime(c.submitted_at))}</td>
+            <td>${escapeHtml(formatIndication(c.indication_category))}</td>
+            <td>${escapeHtml(c.modality || "—")} · ${escapeHtml(c.body_region || "—")}</td>
+            <td><span class="badge badge-${escapeHtml(c.status)}">${escapeHtml(String(c.status).replace(/_/g, " "))}</span></td>
+          </tr>
+        `;
+      }).join("");
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Network error: ${escapeHtml(String(err))}</td></tr>`;
     }
-
-    tbody.innerHTML = sorted.map(c => {
-      const isClickable = CLICKABLE_STATUSES.has(c.status);
-      const rowClass = isClickable ? "clickable" : "inactive";
-      const onClick = isClickable
-        ? `onclick="window.location.href='nurse_workspace.html?case_id=${c.case_id}'"` : "";
-      const arrow = isClickable ? `<span class="arrow-icon">→</span>` : "";
-
-      return `
-        <tr class="${rowClass}" ${onClick}>
-          <td><span class="case-id">${c.case_id}</span>${arrow}</td>
-          <td><span class="patient-id">${c.patient_id}</span></td>
-          <td class="time-cell">${formatDateTime(c.submitted_at)}</td>
-          <td>${formatIndication(c.indication_category)}</td>
-          <td>${c.modality} · ${c.body_region}</td>
-          <td><span class="badge badge-${c.status}">${c.status.replace(/_/g, " ")}</span></td>
-        </tr>
-      `;
-    }).join("");
   }
 
-  render();
+  loadQueue();
 </script>
 
 </body>

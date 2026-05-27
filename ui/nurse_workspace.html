@@ -831,20 +831,10 @@ async function submitDecision(caseId, action) {
   }
 }
 
-function init() {
-  const caseId = getCaseId();
+const API_BASE = window.location.origin || "http://localhost:8000";
+
+function renderWorkspace(caseId, data, isLive) {
   const main = document.getElementById("main-content");
-
-  if (!caseId) {
-    main.innerHTML = `<p class="state-message">No case selected. <a href="queue.html">← Return to queue</a></p>`;
-    return;
-  }
-
-  const data = FIXTURES[caseId];
-  if (!data) {
-    main.innerHTML = `<p class="state-message">Case "${esc(caseId)}" not found. <a href="queue.html">← Return to queue</a></p>`;
-    return;
-  }
 
   // Header meta
   const meta = document.getElementById("header-meta");
@@ -854,7 +844,14 @@ function init() {
     <span>${esc(data.imaging_request.modality)} · ${esc(data.imaging_request.body_region)}${data.imaging_request.with_contrast ? " + contrast" : ""}</span>
   `;
 
-  // Panels
+  // Source-of-brief badge (live vs demo)
+  const badgeHTML = isLive
+    ? `<div style="background:#dcfce7;color:#15803d;padding:8px 14px;border-radius:6px;margin-bottom:16px;font-size:0.82rem;font-weight:600;">✓ LIVE: brief generated from running the pipeline against this case just now.</div>`
+    : `<div style="background:#fef3c7;color:#92400e;padding:8px 14px;border-radius:6px;margin-bottom:16px;font-size:0.82rem;font-weight:600;display:flex;justify-content:space-between;align-items:center;">
+         <span>DEMO BRIEF: curated fixture content. Run the live pipeline to see real output.</span>
+         <button id="btn-run-live" style="background:#92400e;color:#fff;border:0;border-radius:4px;padding:5px 12px;font-size:0.75rem;font-weight:600;cursor:pointer;">Run Live Pipeline</button>
+       </div>`;
+
   const panelsHTML = `
     <div class="panels">
       ${renderAIBrief(data.reasoning_brief)}
@@ -863,7 +860,6 @@ function init() {
     </div>
   `;
 
-  // Action bar
   const actionBarHTML = `
     <div class="action-bar">
       <p class="action-bar-label">Nurse Rationale <span style="color:#ef4444">*</span></p>
@@ -877,17 +873,85 @@ function init() {
     </div>
   `;
 
-  main.innerHTML = panelsHTML + actionBarHTML;
+  main.innerHTML = badgeHTML + panelsHTML + actionBarHTML;
 
   // Rationale → enable/disable buttons
   document.getElementById("rationale").addEventListener("input", function () {
     setButtons(this.value.trim().length > 0);
   });
 
-  // Button click handlers
+  // Action handlers
   document.getElementById("btn-approve").addEventListener("click",  () => submitDecision(caseId, "approve"));
   document.getElementById("btn-escalate").addEventListener("click", () => submitDecision(caseId, "escalate"));
   document.getElementById("btn-pend").addEventListener("click",     () => submitDecision(caseId, "pend"));
+
+  // Live-run handler (only present on the demo badge)
+  const liveBtn = document.getElementById("btn-run-live");
+  if (liveBtn) {
+    liveBtn.addEventListener("click", () => runLivePipeline(caseId));
+  }
+}
+
+async function runLivePipeline(caseId) {
+  const main = document.getElementById("main-content");
+  main.innerHTML = `<p class="state-message">Running pipeline live (4 agents + 5 gates)… typically 20-60 seconds.</p>`;
+  try {
+    // Fetch the submission to send to /decide
+    const subRes = await fetch(`${API_BASE}/api/v1/nurse/case/${encodeURIComponent(caseId)}`);
+    if (!subRes.ok) {
+      main.innerHTML = `<p class="state-message">Could not load case ${esc(caseId)} (HTTP ${subRes.status}).</p>`;
+      return;
+    }
+    const subData = await subRes.json();
+    const decRes = await fetch(`${API_BASE}/api/v1/pa/decide`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(subData.submission),
+    });
+    if (!decRes.ok) {
+      const err = await decRes.json().catch(() => ({}));
+      main.innerHTML = `<p class="state-message">Pipeline error (HTTP ${decRes.status}): ${esc(err.detail || decRes.statusText)}. <a href="queue.html">← Return to queue</a></p>`;
+      return;
+    }
+    const result = await decRes.json();
+    if (result.status !== "completed" || !result.determination) {
+      main.innerHTML = `<p class="state-message">Pipeline status: <strong>${esc(result.status)}</strong>. ${esc(result.escalation_reason || "")} <a href="queue.html">← Return to queue</a></p>`;
+      return;
+    }
+    // Reshape determination into the FIXTURES schema for re-rendering
+    const det = result.determination;
+    const data = {
+      case_id: caseId,
+      patient: subData.submission.patient,
+      imaging_request: subData.submission.imaging_request,
+      reasoning_brief: det.reasoning_brief,
+      policy_map: det.policy_map,
+      context: det.context,
+    };
+    renderWorkspace(caseId, data, /* isLive */ true);
+  } catch (err) {
+    main.innerHTML = `<p class="state-message">Network error: ${esc(String(err))}. <a href="queue.html">← Return to queue</a></p>`;
+  }
+}
+
+function init() {
+  const caseId = getCaseId();
+  const main = document.getElementById("main-content");
+
+  if (!caseId) {
+    main.innerHTML = `<p class="state-message">No case selected. <a href="queue.html">← Return to queue</a></p>`;
+    return;
+  }
+
+  const data = FIXTURES[caseId];
+  if (!data) {
+    main.innerHTML = `<p class="state-message">Case "${esc(caseId)}" has no curated demo brief.
+       <button onclick="runLivePipeline('${esc(caseId)}')" style="background:#2563eb;color:#fff;border:0;border-radius:4px;padding:8px 18px;margin-left:12px;font-weight:600;cursor:pointer;">Run Live Pipeline</button>
+       &nbsp; <a href="queue.html">← Return to queue</a></p>`;
+    return;
+  }
+
+  renderWorkspace(caseId, data, /* isLive */ false);
 }
 
 init();

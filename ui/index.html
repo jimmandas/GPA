@@ -273,29 +273,48 @@
 
 <script>
 /* ------------------------------------------------------------------ */
-/*  Fixture data                                                        */
+/*  Live data from the API (was fixtures; rewired 2026-05-27 for Loom)  */
 /* ------------------------------------------------------------------ */
-const AUDIT_CASES = [
-  { case_id: "case_0001", patient_id: "pt_anon_0001", submitted_at: "2026-05-25T14:02:11Z", status: "pending_review" },
-  { case_id: "case_0002", patient_id: "pt_anon_0002", submitted_at: "2026-05-25T09:15:00Z", status: "pending_review" }
-];
+const API_BASE = window.location.origin || "http://localhost:8000";
+let AUDIT_CASES = [];   // populated from GET /api/v1/audit/cases
+const AUDIT_LOGS = {};  // populated lazily per-case from GET /api/v1/audit/case/{id}
 
-const AUDIT_LOGS = {
-  "case_0001": [
-    { type: "agent_event", agent: "evidence_summarizer",  at: "2026-05-25T14:02:15Z", output_hash: "sha256:abc123..." },
-    { type: "agent_event", agent: "context_retriever",    at: "2026-05-25T14:02:22Z", tool_calls_made: ["patient_history_lookup","prior_imaging_lookup"] },
-    { type: "agent_event", agent: "policy_mapper",        at: "2026-05-25T14:02:30Z", tool_calls_made: ["nccn_passage_lookup"] },
-    { type: "agent_event", agent: "reasoning_drafter",    at: "2026-05-25T14:02:38Z", output_hash: "sha256:def456..." },
-    { type: "pre_state_record", at: "2026-05-25T14:02:39Z", reasoning_brief_hash: "sha256:def456..." }
-  ],
-  "case_0002": [
-    { type: "agent_event", agent: "evidence_summarizer",  at: "2026-05-25T09:15:05Z", output_hash: "sha256:ghi789..." },
-    { type: "agent_event", agent: "context_retriever",    at: "2026-05-25T09:15:12Z", tool_calls_made: ["patient_history_lookup","prior_imaging_lookup"] },
-    { type: "agent_event", agent: "policy_mapper",        at: "2026-05-25T09:15:20Z", tool_calls_made: ["nccn_passage_lookup"] },
-    { type: "agent_event", agent: "reasoning_drafter",    at: "2026-05-25T09:15:28Z", output_hash: "sha256:jkl012..." },
-    { type: "pre_state_record", at: "2026-05-25T09:15:29Z", reasoning_brief_hash: "sha256:jkl012..." }
-  ]
-};
+async function loadAuditCases() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/audit/cases`);
+    if (!res.ok) {
+      console.error("audit cases HTTP", res.status);
+      return [];
+    }
+    const data = await res.json();
+    return (data.cases || []).map(c => ({
+      case_id: c.case_id,
+      patient_id: "—",
+      submitted_at: null,
+      status: c.current_status || "pending_review",
+    }));
+  } catch (err) {
+    console.error("audit cases fetch failed:", err);
+    return [];
+  }
+}
+
+async function loadAuditLog(caseId) {
+  if (AUDIT_LOGS[caseId]) return AUDIT_LOGS[caseId];
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/audit/case/${encodeURIComponent(caseId)}`);
+    if (!res.ok) {
+      console.error("audit log HTTP", res.status, "for", caseId);
+      return [];
+    }
+    const data = await res.json();
+    AUDIT_LOGS[caseId] = data.events || [];
+    return AUDIT_LOGS[caseId];
+  } catch (err) {
+    console.error("audit log fetch failed:", err);
+    return [];
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -400,15 +419,17 @@ function renderRecord(rec) {
 /* ------------------------------------------------------------------ */
 /*  Audit panel renderer                                                */
 /* ------------------------------------------------------------------ */
-function renderAuditPanel(caseId) {
+async function renderAuditPanel(caseId) {
   const panel = document.getElementById("audit-panel");
   const caseData = AUDIT_CASES.find(c => c.case_id === caseId);
-  const logs = AUDIT_LOGS[caseId] || [];
 
   if (!caseData) {
     panel.innerHTML = `<p class="empty-audit">Case not found.</p>`;
     return;
   }
+
+  panel.innerHTML = `<p class="empty-audit">Loading…</p>`;
+  const logs = await loadAuditLog(caseId);
 
   const headerHTML = `
     <div>
@@ -416,9 +437,8 @@ function renderAuditPanel(caseId) {
       <p class="audit-panel-case">${esc(caseId)}</p>
     </div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-      <span style="font-size:0.78rem;color:#6b7280;">Patient: <strong>${esc(caseData.patient_id)}</strong></span>
-      <span style="font-size:0.78rem;color:#6b7280;">Submitted: <strong>${esc(formatTime(caseData.submitted_at))}</strong></span>
-      <span class="badge badge-${caseData.status}">${caseData.status.replace(/_/g," ")}</span>
+      <span style="font-size:0.78rem;color:#6b7280;">Patient: <strong>${esc(caseData.patient_id || "—")}</strong></span>
+      <span class="badge badge-${caseData.status}">${String(caseData.status).replace(/_/g," ")}</span>
     </div>
     <div style="height:1px;background:#e2e5ea;"></div>
   `;
@@ -452,11 +472,14 @@ function selectCase(caseId) {
 /* ------------------------------------------------------------------ */
 /*  Init                                                                */
 /* ------------------------------------------------------------------ */
-function init() {
+async function init() {
+  document.getElementById("audit-panel").innerHTML = `<p class="empty-audit">Loading cases…</p>`;
+  AUDIT_CASES = await loadAuditCases();
   renderSidebar(null);
-  // Auto-select first case
   if (AUDIT_CASES.length > 0) {
     selectCase(AUDIT_CASES[0].case_id);
+  } else {
+    document.getElementById("audit-panel").innerHTML = `<p class="empty-audit">No cases in the audit log yet. Run a case through /api/v1/pa/decide and refresh.</p>`;
   }
 }
 

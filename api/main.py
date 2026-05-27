@@ -145,6 +145,151 @@ def nurse_decision(request: NurseDecisionRequest):
 # Physician peer review endpoints (Phase 2 Week 11)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Nurse queue + per-case endpoints (Loom-readiness, 2026-05-27)
+# ---------------------------------------------------------------------------
+
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+_SUBMISSIONS_DIR = _REPO_ROOT / "tools" / "fixtures" / "submissions"
+_DECISION_LOG_DIR = _REPO_ROOT / "decision_log"
+
+
+def _case_status_from_decision_log(case_id: str) -> str:
+    """Derive a coarse status for the nurse queue from the bilateral log.
+
+    Returns one of: 'pending_review' | 'approved' | 'escalated' | 'pended'.
+    Defaults to 'pending_review' if no log exists.
+    """
+    log = _DECISION_LOG_DIR / f"{case_id}.jsonl"
+    if not log.exists():
+        return "pending_review"
+    # Scan for a nurse_action_record (latest wins)
+    latest_action = None
+    try:
+        with log.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if rec.get("type") == "nurse_action_record":
+                    latest_action = rec.get("nurse_decision")
+    except OSError:
+        return "pending_review"
+    if latest_action == "approve":
+        return "approved"
+    if latest_action == "escalate":
+        return "escalated"
+    if latest_action == "pend":
+        return "pended"
+    return "pending_review"
+
+
+@app.get("/api/v1/nurse/queue")
+def list_nurse_queue():
+    """List case fixtures + current status from the bilateral log."""
+    cases: list[dict[str, Any]] = []
+    if _SUBMISSIONS_DIR.exists():
+        for f in sorted(_SUBMISSIONS_DIR.glob("case_*.json")):
+            try:
+                sub = json.loads(f.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            case_id = sub.get("case_id", f.stem)
+            cases.append({
+                "case_id": case_id,
+                "patient_id": (sub.get("patient") or {}).get("patient_id"),
+                "submitted_at": sub.get("submitted_at"),
+                "indication_category": (sub.get("clinical_indication") or {}).get("diagnosis_text"),
+                "modality": (sub.get("imaging_request") or {}).get("modality"),
+                "body_region": (sub.get("imaging_request") or {}).get("body_region"),
+                "status": _case_status_from_decision_log(case_id),
+            })
+    return {"total": len(cases), "cases": cases}
+
+
+@app.get("/api/v1/nurse/case/{case_id}")
+def get_nurse_case(case_id: str):
+    """Return the submission fixture for a case (used by nurse_workspace.html)."""
+    fixture = _SUBMISSIONS_DIR / f"{case_id}.json"
+    if not fixture.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No submission fixture for case {case_id!r}",
+        )
+    try:
+        submission = json.loads(fixture.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Submission fixture is not valid JSON: {exc}",
+        )
+    return {
+        "case_id": case_id,
+        "submission": submission,
+        "current_status": _case_status_from_decision_log(case_id),
+        "audit_log_ref": f"decision_log/{case_id}.jsonl",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Audit log endpoints (Loom-readiness, 2026-05-27)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/audit/cases")
+def list_audit_cases():
+    """List all cases that have a bilateral decision log."""
+    cases: list[dict[str, Any]] = []
+    if _DECISION_LOG_DIR.exists():
+        for f in sorted(_DECISION_LOG_DIR.glob("case_*.jsonl")):
+            cases.append({
+                "case_id": f.stem,
+                "log_file": f.name,
+                "size_bytes": f.stat().st_size,
+                "current_status": _case_status_from_decision_log(f.stem),
+            })
+    return {"total": len(cases), "cases": cases}
+
+
+@app.get("/api/v1/audit/case/{case_id}")
+def get_audit_case(case_id: str):
+    """Return the bilateral log events for a single case, newest first."""
+    log = _DECISION_LOG_DIR / f"{case_id}.jsonl"
+    if not log.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No decision log for case {case_id!r}",
+        )
+    events: list[dict[str, Any]] = []
+    try:
+        with log.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not read decision log: {exc}",
+        )
+    return {
+        "case_id": case_id,
+        "event_count": len(events),
+        "events": events,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Physician peer review endpoints (Phase 2 Week 11)
+# ---------------------------------------------------------------------------
+
 @app.get("/api/v1/physician/queue")
 def list_physician_queue():
     """Return all pending physician queue entries, FIFO order."""
