@@ -275,7 +275,11 @@
 /* ------------------------------------------------------------------ */
 /*  Live data from the API (was fixtures; rewired 2026-05-27 for Loom)  */
 /* ------------------------------------------------------------------ */
-const API_BASE = window.location.origin || "http://localhost:8000";
+// API_BASE: the FastAPI server is on port 8000; the static UI is on 8001.
+  // We deliberately do NOT use window.location.origin here — that resolves to
+  // the UI server (8001) which doesn't host the API. Override at runtime by
+  // setting window.GPA_API_BASE before this script loads.
+  const API_BASE = window.GPA_API_BASE || "http://" + window.location.hostname + ":8000";
 let AUDIT_CASES = [];   // populated from GET /api/v1/audit/cases
 const AUDIT_LOGS = {};  // populated lazily per-case from GET /api/v1/audit/case/{id}
 
