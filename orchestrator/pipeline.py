@@ -21,6 +21,10 @@ from gates.ai_decision_limit import check as check_ai_decision_limit, AIDecision
 from gates.denial import check as check_denial, DenialAttemptError
 
 from agents.evidence_summarizer import agent as evidence_summarizer
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from physician_queue.queue import PhysicianQueue
 from agents.context_retriever import agent as context_retriever
 from agents.policy_mapper import agent as policy_mapper
 from agents.reasoning_drafter import agent as reasoning_drafter
@@ -195,29 +199,35 @@ async def _run_async(submission: dict) -> PipelineResult:
 # Nurse decision recording
 # ---------------------------------------------------------------------------
 
-def record_nurse_decision(case_id: str, action: str, rationale: str) -> PipelineResult:
+def record_nurse_decision(
+    case_id: str,
+    action: str,
+    rationale: str,
+    physician_queue: "PhysicianQueue | None" = None,
+) -> PipelineResult:
     """
     Record a nurse's decision after reviewing the AI brief.
 
-    - Runs Denial Gate check on action
+    - Runs Denial Gate check on action (MVP block mode by default, route mode with physician_queue)
     - Writes post-state record to bilateral logger (write-before-emit)
     - Returns PipelineResult with final determination
 
     Args:
         case_id:   The case identifier.
-        action:    "approve" | "escalate" | "pend"
+        action:    "approve" | "escalate" | "pend" (or "deny" in route mode with physician record).
         rationale: Required nurse rationale (non-empty).
+        physician_queue: Optional PhysicianQueue for route mode denial validation.
 
     Raises:
         ValueError: if rationale is empty or whitespace-only.
-        DenialAttemptError: if action is "deny" or unknown.
+        DenialAttemptError: if action is "deny" without proper physician authorization.
         BilateralLoggerError: if logger fails to commit.
     """
     if not rationale or not rationale.strip():
         raise ValueError("Nurse rationale is required and cannot be empty.")
 
-    # Denial Gate
-    check_denial({"path": action})
+    # Denial Gate (pass case_id + physician_queue for route mode support)
+    check_denial({"path": action, "case_id": case_id}, physician_queue=physician_queue)
 
     # Post-state bilateral log record
     post_state = {

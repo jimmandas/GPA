@@ -147,6 +147,41 @@ def test_record_nurse_decision_deny_raises(monkeypatch, tmp_path):
         record_nurse_decision("case_test", "deny", "Not covered.")
 
 
+def test_record_nurse_decision_deny_with_physician_queue(monkeypatch, tmp_path):
+    """
+    Route mode: denial is permitted when a PhysicianQueue has a recorded DENY action.
+    """
+    from physician_queue.queue import FilePhysicianQueue, PhysicianAction
+
+    monkeypatch.setenv("DENIAL_GATE_MODE", "route")
+    _patch_logger(monkeypatch, tmp_path)
+
+    queue_dir = tmp_path / "queue"
+    queue_dir.mkdir()
+    physician_queue = FilePhysicianQueue(queue_dir / "state.json")
+
+    case_id = "case_physician_deny"
+    physician_queue.enqueue(case_id, reason="ai_brief_flags_unmet_criteria")
+    physician_queue.record_action(
+        case_id=case_id,
+        action=PhysicianAction.DENY,
+        physician_id="dr_smith",
+        clinical_basis="pathologic staging not documented",
+        guideline_citation="NCCN-NSCLC-SURV-2",
+        evidence_gaps=["missing pathology report"],
+    )
+
+    # Should NOT raise — physician has acted
+    result = record_nurse_decision(
+        case_id,
+        "deny",
+        "Physician review required; clinical criteria unmet.",
+        physician_queue=physician_queue,
+    )
+    assert result.status == "completed"
+    assert result.determination["path"] == "deny"
+
+
 def test_record_nurse_decision_writes_bilateral_log(monkeypatch, tmp_path):
     """
     record_nurse_decision must write a nurse_action_record to the bilateral log.
