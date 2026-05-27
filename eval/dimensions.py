@@ -24,6 +24,7 @@ False-Escalation Rate + Rationale Faithfulness aggregates.)
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter
 from dataclasses import dataclass
 
@@ -509,6 +510,177 @@ def score_cohens_kappa(cases: list[dict]) -> DimensionScore:
         notes=(
             f"κ={kappa:.2f} over {len(rater_a)} co-labeled cases "
             f"({labeled_case_ids})."
+        ),
+        is_aggregate=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 9. Physician Queue Routing Accuracy (AGGREGATE) — Phase 2 §12
+# ---------------------------------------------------------------------------
+
+def score_physician_queue_routing_accuracy(
+    cases: list[dict],
+    physician_queue=None,
+) -> DimensionScore:
+    """
+    Score = correctly_routed / total_cases_with_expected_routing.
+
+    Ground truth schema (add to ground_truth.jsonl):
+      "expected_physician_routing": true | false
+
+    Predicted = is there a queue entry for this case?
+
+    Returns N/A until at least one case has expected_physician_routing set.
+    Returns N/A if no queue is provided (eval not run in route mode).
+
+    Target: >=0.80
+    """
+    target = ">=0.80"
+    dim = "physician_queue_routing_accuracy"
+
+    if physician_queue is None:
+        return DimensionScore(
+            dimension=dim,
+            score=None,
+            target=target,
+            passed=None,
+            notes=(
+                "No PhysicianQueue provided. Set DENIAL_GATE_MODE=route + pass a "
+                "queue to the eval to drive this dim."
+            ),
+            is_aggregate=True,
+        )
+
+    expected_cases = [
+        c for c in cases
+        if "expected_physician_routing" in c.get("ground_truth", {})
+    ]
+    if not expected_cases:
+        return DimensionScore(
+            dimension=dim,
+            score=None,
+            target=target,
+            passed=None,
+            notes=(
+                "No ground_truth case has `expected_physician_routing`. "
+                "Add the field per case to enable this dim."
+            ),
+            is_aggregate=True,
+        )
+
+    correct = 0
+    incorrect_cases: list[str] = []
+    for c in expected_cases:
+        case_id = c["case_id"]
+        expected = bool(c["ground_truth"]["expected_physician_routing"])
+        actual = physician_queue.get(case_id) is not None
+        if expected == actual:
+            correct += 1
+        else:
+            incorrect_cases.append(case_id)
+
+    score = correct / len(expected_cases)
+    return DimensionScore(
+        dimension=dim,
+        score=score,
+        target=target,
+        passed=score >= 0.80,
+        notes=(
+            f"{correct}/{len(expected_cases)} cases correctly routed."
+            + (f" Misrouted: {incorrect_cases}" if incorrect_cases else "")
+        ),
+        is_aggregate=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 10. Physician Rationale Compliance (AGGREGATE) — Phase 2 §12
+# ---------------------------------------------------------------------------
+
+# Quality thresholds beyond what record_action's boundary check enforces.
+# record_action already rejects empty fields; these heuristics catch junk
+# text that satisfies the presence check but doesn't carry real content.
+_MIN_CLINICAL_BASIS_CHARS = 20
+_MIN_EVIDENCE_GAP_CHARS = 10
+_CITATION_SEPARATOR_RE = re.compile(r"[-_:.]")  # matches NCCN-style structured IDs
+
+
+def score_physician_rationale_compliance(physician_queue=None) -> DimensionScore:
+    """
+    Score = compliant_actions / total_actions.
+
+    For every recorded physician ActionRecord, compliance requires:
+      - clinical_basis length >= 20 chars (catches stub answers)
+      - guideline_citation contains a structured separator (-, _, :, .)
+      - For DENY actions: every evidence_gap entry is >= 10 chars
+
+    Returns N/A if no queue is provided or no action records exist.
+
+    Target: >=0.95 — boundary enforcement makes near-perfect achievable.
+    """
+    target = ">=0.95"
+    dim = "physician_rationale_compliance"
+
+    if physician_queue is None:
+        return DimensionScore(
+            dimension=dim,
+            score=None,
+            target=target,
+            passed=None,
+            notes="No PhysicianQueue provided.",
+            is_aggregate=True,
+        )
+
+    # Read action records via FilePhysicianQueue's _read; same path the
+    # denial gate uses. Other PhysicianQueue impls would expose actions
+    # differently — extend here when that lands.
+    state = getattr(physician_queue, "_read", lambda: {"actions": []})()
+    actions = state.get("actions", [])
+
+    if not actions:
+        return DimensionScore(
+            dimension=dim,
+            score=None,
+            target=target,
+            passed=None,
+            notes="Queue has no recorded physician actions.",
+            is_aggregate=True,
+        )
+
+    compliant = 0
+    failures: list[str] = []
+    for a in actions:
+        case_id = a.get("case_id", "<unknown>")
+        clinical_basis = a.get("clinical_basis", "") or ""
+        guideline_citation = a.get("guideline_citation", "") or ""
+        evidence_gaps = a.get("evidence_gaps") or []
+        action_type = a.get("action", "")
+
+        reasons: list[str] = []
+        if len(clinical_basis.strip()) < _MIN_CLINICAL_BASIS_CHARS:
+            reasons.append(f"clinical_basis<{_MIN_CLINICAL_BASIS_CHARS}ch")
+        if not _CITATION_SEPARATOR_RE.search(guideline_citation):
+            reasons.append("citation_no_structured_id")
+        if action_type == "deny":
+            short_gaps = [g for g in evidence_gaps if len(str(g).strip()) < _MIN_EVIDENCE_GAP_CHARS]
+            if short_gaps:
+                reasons.append(f"evidence_gap_short<{_MIN_EVIDENCE_GAP_CHARS}ch")
+
+        if not reasons:
+            compliant += 1
+        else:
+            failures.append(f"{case_id}:{','.join(reasons)}")
+
+    score = compliant / len(actions)
+    return DimensionScore(
+        dimension=dim,
+        score=score,
+        target=target,
+        passed=score >= 0.95,
+        notes=(
+            f"{compliant}/{len(actions)} action records compliant."
+            + (f" Non-compliant: {failures}" if failures else "")
         ),
         is_aggregate=True,
     )
