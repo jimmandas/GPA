@@ -41,11 +41,54 @@ def test_yaml_loaded_when_no_env_var(module_path, monkeypatch):
     assert snapshot == "claude-opus-4-1-20250805"
 
 
-def test_eval_runner_sets_sonnet_override():
-    """eval/runner.py must set MODEL_SNAPSHOT_OVERRIDE to Sonnet at import."""
-    # Force a fresh import so module-level os.environ assignment fires
+def _reimport_runner():
+    """Force a fresh import of eval.runner so module-level setup re-runs."""
     import sys
     if "eval.runner" in sys.modules:
         del sys.modules["eval.runner"]
     import eval.runner  # noqa: F401
+
+
+def test_eval_runner_dev_tier_sets_sonnet_override(monkeypatch):
+    """EVAL_TIER unset or 'dev' → MODEL_SNAPSHOT_OVERRIDE pinned to Sonnet."""
+    monkeypatch.delenv("EVAL_TIER", raising=False)
+    monkeypatch.delenv("MODEL_SNAPSHOT_OVERRIDE", raising=False)
+    _reimport_runner()
     assert os.environ.get("MODEL_SNAPSHOT_OVERRIDE") == "claude-sonnet-4-5-20250929"
+
+
+def test_eval_runner_dev_tier_explicit(monkeypatch):
+    """EVAL_TIER=dev produces the same Sonnet override."""
+    monkeypatch.setenv("EVAL_TIER", "dev")
+    monkeypatch.delenv("MODEL_SNAPSHOT_OVERRIDE", raising=False)
+    _reimport_runner()
+    assert os.environ.get("MODEL_SNAPSHOT_OVERRIDE") == "claude-sonnet-4-5-20250929"
+
+
+def test_eval_runner_ship_tier_does_not_override(monkeypatch):
+    """EVAL_TIER=ship leaves MODEL_SNAPSHOT_OVERRIDE unset so model.yaml wins."""
+    monkeypatch.setenv("EVAL_TIER", "ship")
+    monkeypatch.delenv("MODEL_SNAPSHOT_OVERRIDE", raising=False)
+    _reimport_runner()
+    assert "MODEL_SNAPSHOT_OVERRIDE" not in os.environ
+
+
+def test_eval_runner_rejects_invalid_tier(monkeypatch):
+    """Typos like EVAL_TIER=develop must fail loud at import time."""
+    monkeypatch.setenv("EVAL_TIER", "develop")
+    monkeypatch.delenv("MODEL_SNAPSHOT_OVERRIDE", raising=False)
+    import sys
+    if "eval.runner" in sys.modules:
+        del sys.modules["eval.runner"]
+    with pytest.raises(ValueError, match="EVAL_TIER must be"):
+        import eval.runner  # noqa: F401
+
+
+def test_ship_tier_routes_to_production_opus(monkeypatch):
+    """End-to-end: ship tier → agents read model.yaml → Opus snapshot."""
+    monkeypatch.setenv("EVAL_TIER", "ship")
+    monkeypatch.delenv("MODEL_SNAPSHOT_OVERRIDE", raising=False)
+    _reimport_runner()
+    # With the override unset, any agent's loader should fall back to yaml.
+    from agents.policy_mapper.agent import _load_model_snapshot
+    assert _load_model_snapshot() == "claude-opus-4-1-20250805"

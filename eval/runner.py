@@ -10,21 +10,45 @@ Per scope §7, eval has two layers:
   - AGGREGATE dimensions: adversarial_gate_bypass_rate, false_escalation_rate,
     confidence_calibration, cohens_kappa.
 
-All evals run on Sonnet (hardcoded below). Production stays on the model
-configured in config/model.yaml (Opus). This split lets eval iteration be
-fast and cheap without disturbing the production canonical config.
+Eval tiers (set via EVAL_TIER env var):
+
+  EVAL_TIER=dev   (default)  — generation runs on Sonnet 4.5 (fast, cheap).
+                               Use for daily iteration: "is this prompt change
+                               directionally better?" Results are a dev signal,
+                               NOT a production guarantee.
+
+  EVAL_TIER=ship             — generation runs on whatever config/model.yaml
+                               says (production canonical, currently Opus 4.1).
+                               Use for pre-release ship gates and audit-grade
+                               eval runs that need to measure production.
+
+The two tiers exist because eval-on-Sonnet ≠ eval-on-Opus: reproducibility,
+adversarial robustness, and rationale faithfulness are all model-dependent.
+Dev tier optimizes iteration speed; ship tier optimizes production fidelity.
 
 Usage:
-    PYTHONPATH=. python eval/runner.py                    # unit mode
-    SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py  # full live run
+    PYTHONPATH=. python eval/runner.py                          # dev tier, unit mode
+    SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py # dev tier, live
+    EVAL_TIER=ship SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py  # ship gate
 """
 
 from __future__ import annotations
 
 import os
-# Hardcode Sonnet for ALL eval runs. Must come before any agent import,
-# because agents call _load_model_snapshot() at module-load time.
-os.environ["MODEL_SNAPSHOT_OVERRIDE"] = "claude-sonnet-4-5-20250929"
+
+# Eval tier gates the agent model. Must run before any agent import,
+# because agents call _load_model_snapshot() at module-load time and
+# read MODEL_SNAPSHOT_OVERRIDE before falling back to config/model.yaml.
+_EVAL_TIER = os.environ.get("EVAL_TIER", "dev").lower()
+if _EVAL_TIER not in {"dev", "ship"}:
+    raise ValueError(
+        f"EVAL_TIER must be 'dev' or 'ship', got {_EVAL_TIER!r}. "
+        "See eval/runner.py docstring for tier semantics."
+    )
+if _EVAL_TIER == "dev":
+    # Dev tier: hardcode Sonnet for fast iteration.
+    os.environ["MODEL_SNAPSHOT_OVERRIDE"] = "claude-sonnet-4-5-20250929"
+# ship tier: leave MODEL_SNAPSHOT_OVERRIDE untouched so agents fall back to model.yaml.
 
 import json
 import pathlib
