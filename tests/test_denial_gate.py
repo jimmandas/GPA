@@ -8,7 +8,13 @@ DENY action for the case.
 
 import pytest
 from gates.denial import check, DenialAttemptError
+from logs.bilateral_logger import BilateralLogger
 from physician_queue.queue import FilePhysicianQueue, PhysicianAction
+
+
+def _tmp_logger(tmp_path):
+    """Build a tmp-scoped BilateralLogger so record_action doesn't dirty decision_log/."""
+    return BilateralLogger(tmp_path / "decision_log", tmp_path / "failures.jsonl")
 
 
 class TestDenialGateMVPBlockMode:
@@ -96,6 +102,7 @@ class TestDenialGateRouteModeWithPhysicianAction:
             clinical_basis="pathologic staging not documented; SURV-2 unmet",
             guideline_citation="NCCN-NSCLC-SURV-2",
             evidence_gaps=["missing pathology report from initial staging"],
+            logger=_tmp_logger(tmp_path),
         )
         # Should NOT raise — physician has acted
         check({"path": "deny", "case_id": "case_0001"}, physician_queue=q)
@@ -111,6 +118,7 @@ class TestDenialGateRouteModeWithPhysicianAction:
             physician_id="dr_smith",
             clinical_basis="criteria met after review",
             guideline_citation="NCCN-NSCLC-SURV-1",
+            logger=_tmp_logger(tmp_path),
         )
         with pytest.raises(DenialAttemptError, match="no recorded physician DENY action"):
             check({"path": "deny", "case_id": "case_0001"}, physician_queue=q)

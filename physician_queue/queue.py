@@ -32,7 +32,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from logs.bilateral_logger import BilateralLogger
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +114,7 @@ class PhysicianQueue(ABC):
         guideline_citation: str,
         evidence_gaps: list[str] | None = None,
         rationale: str = "",
+        logger: "BilateralLogger | None" = None,
     ) -> ActionRecord:
         raise NotImplementedError
 
@@ -231,6 +235,7 @@ class FilePhysicianQueue(PhysicianQueue):
         guideline_citation: str,
         evidence_gaps: list[str] | None = None,
         rationale: str = "",
+        logger: "BilateralLogger | None" = None,
     ) -> ActionRecord:
         # Validation — fail loud
         if not physician_id.strip():
@@ -266,8 +271,6 @@ class FilePhysicianQueue(PhysicianQueue):
                     if action == PhysicianAction.REQUEST_ADDITIONAL_EVIDENCE
                     else QueueState.COMPLETED.value
                 )
-                entry["state"] = new_state
-                entry["physician_id"] = physician_id
                 break
         else:
             raise FilePhysicianQueueError(
@@ -285,6 +288,29 @@ class FilePhysicianQueue(PhysicianQueue):
             rationale=rationale,
             recorded_at=_now_iso(),
         )
+
+        # Write-before-emit: commit the bilateral audit record first.
+        # If the durable write fails, queue state is unchanged.
+        # Lazy import to keep physician_queue free of logger dependency at import time.
+        from logs.bilateral_logger import get_logger
+        active_logger = logger if logger is not None else get_logger()
+        audit_record = {
+            "type": "physician_action_record",
+            "case_id": case_id,
+            "action": action.value,
+            "physician_id": physician_id,
+            "clinical_basis": clinical_basis,
+            "guideline_citation": guideline_citation,
+            "evidence_gaps": evidence_gaps or [],
+            "rationale": rationale,
+            "queue_state_after": new_state,
+            "at": record.recorded_at,
+        }
+        active_logger.commit(case_id, audit_record)
+
+        # Now update queue state (durable audit already committed)
+        entry["state"] = new_state
+        entry["physician_id"] = physician_id
         state["actions"].append(asdict(record))
         self._write(state)
         return record

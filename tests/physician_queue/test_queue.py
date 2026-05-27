@@ -236,3 +236,84 @@ class TestStateFilePersistence:
         q = FilePhysicianQueue(state_path)
         with pytest.raises(FilePhysicianQueueError, match="corrupt_state"):
             q.list_pending()
+
+
+class TestBilateralLoggerEmission:
+    """
+    record_action must write a physician_action_record to the bilateral
+    logger so per-case decision_log JSONL has the full audit lineage.
+    """
+
+    def test_record_action_writes_physician_action_record(self, tmp_path, isolate_bilateral_logger):
+        q = _new_queue(tmp_path)
+        q.enqueue("case_0001", "test")
+        q.record_action(
+            "case_0001",
+            PhysicianAction.APPROVE,
+            physician_id="dr_smith",
+            clinical_basis="all criteria met",
+            guideline_citation="NCCN-NSCLC-SURV-1",
+        )
+
+        log_file = isolate_bilateral_logger._log_dir / "case_0001.jsonl"
+        assert log_file.exists(), "bilateral logger must write to case_id JSONL"
+        records = [json.loads(line) for line in log_file.read_text().splitlines() if line.strip()]
+        physician_records = [r for r in records if r.get("type") == "physician_action_record"]
+        assert len(physician_records) == 1
+        rec = physician_records[0]
+        assert rec["case_id"] == "case_0001"
+        assert rec["action"] == "approve"
+        assert rec["physician_id"] == "dr_smith"
+        assert rec["clinical_basis"] == "all criteria met"
+        assert rec["guideline_citation"] == "NCCN-NSCLC-SURV-1"
+        assert rec["queue_state_after"] == "completed"
+        assert rec["at"]
+
+    def test_record_action_deny_log_includes_evidence_gaps(self, tmp_path, isolate_bilateral_logger):
+        q = _new_queue(tmp_path)
+        q.enqueue("case_0001", "test")
+        q.record_action(
+            "case_0001",
+            PhysicianAction.DENY,
+            physician_id="dr_smith",
+            clinical_basis="staging not documented",
+            guideline_citation="NCCN-NSCLC-SURV-2",
+            evidence_gaps=["missing pathology report"],
+            rationale="See physician note.",
+        )
+
+        log_file = isolate_bilateral_logger._log_dir / "case_0001.jsonl"
+        records = [json.loads(line) for line in log_file.read_text().splitlines() if line.strip()]
+        rec = next(r for r in records if r.get("type") == "physician_action_record")
+        assert rec["action"] == "deny"
+        assert rec["evidence_gaps"] == ["missing pathology report"]
+        assert rec["rationale"] == "See physician note."
+        assert rec["queue_state_after"] == "completed"
+
+    def test_logger_failure_blocks_state_update(self, tmp_path, monkeypatch):
+        """Write-before-emit: if the bilateral logger fails, queue state stays unchanged."""
+        from logs.bilateral_logger import BilateralLogger, BilateralLoggerError
+
+        class FailingLogger(BilateralLogger):
+            def commit(self, case_id, record):
+                raise BilateralLoggerError(case_id, "test_failure", "simulated fsync failure")
+
+        failing_logger = FailingLogger(tmp_path / "failing_log", tmp_path / "failures.jsonl")
+        q = _new_queue(tmp_path)
+        q.enqueue("case_0001", "test")
+
+        with pytest.raises(BilateralLoggerError):
+            q.record_action(
+                "case_0001",
+                PhysicianAction.APPROVE,
+                physician_id="dr_smith",
+                clinical_basis="ok",
+                guideline_citation="NCCN-NSCLC-SURV-1",
+                logger=failing_logger,
+            )
+
+        # Queue state.json must NOT have been modified — case still pending
+        entry = q.get("case_0001")
+        assert entry.state == QueueState.PENDING
+        raw = json.loads((tmp_path / "state.json").read_text())
+        assert len(raw["actions"]) == 0
