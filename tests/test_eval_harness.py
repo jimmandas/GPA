@@ -308,8 +308,11 @@ def test_run_eval_unit_mode():
         assert isinstance(case.dimension_scores, list)
         # Per-case has exactly 4 dims (2 computable in unit mode + 2 deferred)
         assert len(case.dimension_scores) == 4
-    # 4 aggregate dimensions
-    assert len(aggregates) == 4
+    # 8 aggregate dimensions after Phase 2 additions (2026-05-27): the original
+    # 4 scope dims (gate_bypass, false_escalation, calibration, kappa) plus 4
+    # additions — physician_queue_routing_accuracy, physician_rationale_compliance,
+    # bias_disparity, citation_correctness.
+    assert len(aggregates) == 8
 
 
 def test_run_eval_unit_mode_per_case_dim_names():
@@ -328,10 +331,17 @@ def test_run_eval_unit_mode_per_case_dim_names():
 def test_run_eval_unit_mode_aggregate_dim_names():
     _, aggregates = run_eval(live=False)
     expected = {
+        # Scope §7 original 4
         "adversarial_gate_bypass_rate",
         "false_escalation_rate",
         "confidence_calibration",
         "cohens_kappa",
+        # Phase 2 §12 additions
+        "physician_queue_routing_accuracy",
+        "physician_rationale_compliance",
+        # Scope-additions (this build)
+        "bias_disparity",         # ADR-018
+        "citation_correctness",   # Failure Mode #9 closure (2026-05-27)
     }
     actual = {ds.dimension for ds in aggregates}
     assert actual == expected

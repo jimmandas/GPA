@@ -66,6 +66,10 @@ from eval.dimensions import (
     score_false_escalation_rate,
     score_confidence_calibration,
     score_cohens_kappa,
+    score_physician_queue_routing_accuracy,
+    score_physician_rationale_compliance,
+    score_bias_disparity,
+    score_citation_correctness,
 )
 
 
@@ -186,14 +190,35 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
                 for ds in ec.dimension_scores
                 if ds.score is not None
             },
+            # Bias-disparity dim reads this key; mirror of per_case_scores
+            # with a name that matches the dim's expected interface.
+            "per_case_dim_scores": {
+                ds.dimension: ds.score
+                for ds in ec.dimension_scores
+                if ds.score is not None
+            },
         }
         for ec in eval_cases
     ]
+
+    # Pass the default physician_queue singleton to the physician dims.
+    # These dims return N/A in default eval runs (queue is empty unless
+    # the eval explicitly enqueues cases or runs in route mode).
+    try:
+        from physician_queue import get_queue
+        _phys_queue = get_queue()
+    except Exception:
+        _phys_queue = None
+
     aggregate_scores = [
         score_adversarial_gate_bypass_rate(cases_for_aggregates),
         score_false_escalation_rate(cases_for_aggregates),
         score_confidence_calibration(cases_for_aggregates),
         score_cohens_kappa(cases_for_aggregates),
+        score_physician_queue_routing_accuracy(cases_for_aggregates, physician_queue=_phys_queue),
+        score_physician_rationale_compliance(physician_queue=_phys_queue),
+        score_bias_disparity(cases_for_aggregates),
+        score_citation_correctness(cases_for_aggregates),
     ]
     return eval_cases, aggregate_scores
 
@@ -373,12 +398,19 @@ def print_report(
         status = "PASS" if ec.overall_pass else "FAIL"
         print(f"### {ec.case_id} ({label}) — {status}")
         print()
-        print("| Dimension | Score | Target | Status |")
-        print("|---|---|---|---|")
+        print("| Dimension | Score | Target | Status | Notes |")
+        print("|---|---|---|---|---|")
         for ds in ec.dimension_scores:
             score_str = "N/A" if ds.score is None else f"{ds.score:.2f}"
             status_str = "—" if ds.passed is None else ("✓" if ds.passed else "✗")
-            print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} |")
+            # Notes are how we surface WHY a dim is N/A or what the failure looks like.
+            # Without this, an N/A score has no actionable detail — a real diagnostic gap
+            # exposed by the 2026-05-27 eval where 12/15 cases had `rationale_faithfulness=N/A`
+            # and no per-case detail to explain why.
+            notes = (ds.notes or "").replace("|", "\\|").replace("\n", " ")[:120]
+            if notes and len(ds.notes or "") > 120:
+                notes += "…"
+            print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} | {notes} |")
         print()
 
     # Aggregate section

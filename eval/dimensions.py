@@ -809,7 +809,116 @@ def score_bias_disparity(cases: list[dict]) -> DimensionScore:
     )
 
 
-# 12. RAG Passage Relevance — REMOVED 2026-05-27.
+# ---------------------------------------------------------------------------
+# 12. Citation Correctness (AGGREGATE) — closes Failure Mode #9
+# ---------------------------------------------------------------------------
+#
+# Scope §8 Failure Mode #9: "Faithful-but-Wrong — rationale cites evidence
+# coherently, but the underlying clinical judgment is wrong."
+#
+# Existing dims catch related issues:
+#   - source_citation_accuracy: claims cite a verifiable source_ref (no fabrication)
+#   - rationale_faithfulness: claims are supported by the material at that source_ref
+#
+# Neither catches: "claim cites a VALID passage that is the WRONG passage for
+# this case." That's the gap this dim closes — at the policy_map level, where
+# the agent picked which NCCN criteria to consult.
+#
+# Compares the set of NCCN passage IDs the policy mapper actually cited against
+# the set of passage IDs the ground truth says were relevant for this case.
+
+def score_citation_correctness(cases: list[dict]) -> DimensionScore:
+    """
+    Aggregate dim. For each labeled case:
+        cited     = NCCN passage IDs referenced in policy_map.criteria
+        expected  = passage IDs in ground_truth.expected_criterion_status
+        precision = |cited ∩ expected| / |cited|
+
+    Score = mean(precision) across cases with labels AND a non-empty cited set.
+
+    Failure mode caught: a brief that cites a real but wrong NCCN passage
+    (Faithful-but-Wrong, scope §8 mode #9). Precision is the right primitive —
+    we want few false positives (don't cite passages that aren't relevant).
+    Recall is covered by physician_queue_routing_accuracy and other dims.
+
+    Returns N/A if no cases have both expected_criterion_status AND a populated
+    policy_map.criteria. Target: >=0.95 (citations should be near-perfectly correct).
+    """
+    target = ">=0.95"
+    dim = "citation_correctness"
+
+    if not cases:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No cases to evaluate.", is_aggregate=True,
+        )
+
+    per_case_precisions: list[tuple[str, float]] = []
+    misfires: list[str] = []
+    for c in cases:
+        gt = c.get("ground_truth", {})
+        expected_status = gt.get("expected_criterion_status", {})
+        if not isinstance(expected_status, dict) or not expected_status:
+            continue
+        expected_ids = set(expected_status.keys())
+
+        policy_map = (
+            c.get("pipeline_result", {}).get("policy_map")
+            or c.get("policy_map")
+            or {}
+        )
+        if not isinstance(policy_map, dict):
+            continue
+
+        cited_ids: set[str] = set()
+        for crit in policy_map.get("criteria") or []:
+            if not isinstance(crit, dict):
+                continue
+            pid = crit.get("nccn_passage_id") or crit.get("passage_id")
+            if isinstance(pid, str) and pid:
+                cited_ids.add(pid)
+        # Also check policy_map.passage_ids_used if present
+        for pid in policy_map.get("passage_ids_used") or []:
+            if isinstance(pid, str) and pid:
+                cited_ids.add(pid)
+
+        if not cited_ids:
+            continue  # nothing to score precision on
+
+        correct = cited_ids & expected_ids
+        precision = len(correct) / len(cited_ids)
+        per_case_precisions.append((c.get("case_id", "<?>"), precision))
+        if precision < 1.0:
+            wrong = cited_ids - expected_ids
+            misfires.append(f"{c.get('case_id', '?')}: wrong-cited {sorted(wrong)}")
+
+    if not per_case_precisions:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes=(
+                "No cases have BOTH ground_truth.expected_criterion_status AND a "
+                "populated policy_map.criteria. Needs labeled cases + a run."
+            ),
+            is_aggregate=True,
+        )
+
+    mean_precision = sum(p for _, p in per_case_precisions) / len(per_case_precisions)
+    note_parts = [
+        f"Precision = {mean_precision:.2f} over {len(per_case_precisions)} cases."
+    ]
+    if misfires:
+        note_parts.append(f"Wrong citations: {misfires[:5]}" + (" …" if len(misfires) > 5 else ""))
+    return DimensionScore(
+        dimension=dim,
+        score=mean_precision,
+        target=target,
+        passed=mean_precision >= 0.95,
+        notes=" ".join(note_parts),
+        is_aggregate=True,
+    )
+
+
+# 13. RAG Passage Relevance — REMOVED 2026-05-27.
 #
 # This dim was added earlier today (Phase 2 §12 deliverable) but cut when
 # the full RAG initiative was deferred to Phase 3. Reasoning: the dim
