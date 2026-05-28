@@ -288,31 +288,74 @@ def _per_case_scores(
     agent_outputs: list[dict],
     agent_names: list[str],
     overall_signals: list[str | None] | None,
+    pipeline_run_telemetry: list[list[dict]] | None = None,
+    pipeline_run_wall_seconds: list[float] | None = None,
+    pipeline_run_statuses: list[str] | None = None,
 ) -> list[DimensionScore]:
-    """Score the 4 per-case dimensions."""
+    """Score the 7 per-case dimensions (4 behavioral + 3 telemetry-driven)."""
+    from eval.dimensions import (
+        BUCKET_TRUST,
+        BUCKET_VALUE,
+        BUCKET_OPERATIONAL,
+        score_case_cost_usd,
+        score_case_wall_time_seconds,
+        score_case_completion_rate,
+    )
+    # Resolve the active agent model snapshot for per-case cost. Read the same
+    # way the cost dim does — env override first (EVAL_TIER sets this), then
+    # config/model.yaml.
+    import os as _os
+    import pathlib as _pl
+    import yaml as _yaml
+    model_snapshot = _os.environ.get("MODEL_SNAPSHOT_OVERRIDE")
+    if not model_snapshot:
+        try:
+            cfg_path = _pl.Path(__file__).resolve().parents[1] / "config" / "model.yaml"
+            model_snapshot = _yaml.safe_load(cfg_path.read_text(encoding="utf-8")).get(
+                "model_snapshot", "unknown"
+            )
+        except Exception:
+            model_snapshot = "unknown"
+
     return [
         score_source_citation_accuracy(reasoning_brief),
         score_ai_decision_limit(agent_outputs, agent_names),
         (
             score_rationale_faithfulness(reasoning_brief, submission, context, policy_map)
             if overall_signals is not None
-            else _deferred("rationale_faithfulness", ">=0.80")
+            else _deferred("rationale_faithfulness", ">=0.80", BUCKET_TRUST)
         ),
         (
             score_decision_reproducibility(overall_signals)
             if overall_signals is not None
-            else _deferred("decision_reproducibility", ">=0.80")
+            else _deferred("decision_reproducibility", ">=0.80", BUCKET_OPERATIONAL)
         ),
+        # Per-case Value + Operational dims (telemetry-driven; Phase 2 close-out
+        # for the per-case bucket-distribution gap)
+        score_case_cost_usd(pipeline_run_telemetry, model_snapshot),
+        score_case_wall_time_seconds(pipeline_run_wall_seconds),
+        score_case_completion_rate(pipeline_run_statuses),
     ]
 
 
-def _deferred(name: str, target: str) -> DimensionScore:
+def _deferred(name: str, target: str, bucket: str | None = None) -> DimensionScore:
+    """
+    Placeholder DimensionScore for dims that can't compute in unit mode.
+
+    `bucket` must be passed explicitly when the real scorer assigns a non-Trust
+    bucket — otherwise the deferred placeholder defaults to Trust and the report's
+    Bucket column shows the wrong attribution (e.g., decision_reproducibility
+    is Operational, not Trust). Default kept as None so existing callers that
+    DON'T care about the bucket still work.
+    """
+    from eval.dimensions import BUCKET_TRUST
     return DimensionScore(
         dimension=name,
         score=None,
         target=target,
         passed=None,
         notes="Not computed in unit mode (requires live SDK run).",
+        bucket=bucket if bucket is not None else BUCKET_TRUST,
     )
 
 
@@ -433,6 +476,9 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
         agent_outputs=agent_outputs,
         agent_names=agent_names,
         overall_signals=overall_signals,
+        pipeline_run_telemetry=run_telemetry,
+        pipeline_run_wall_seconds=run_wall_seconds,
+        pipeline_run_statuses=run_statuses,
     )
     return EvalCase(
         case_id=case_id,

@@ -267,6 +267,141 @@ def score_decision_reproducibility(
 
 
 # ---------------------------------------------------------------------------
+# Per-case Value + Operational dims (2026-05-28 — close the per-case-section
+# bucket-distribution gap; per-case used to be 100% Trust because the natural
+# per-case observables are behavioral. With telemetry now captured, per-case
+# can also surface cost and operational signals for each case.)
+# ---------------------------------------------------------------------------
+
+def score_case_cost_usd(
+    pipeline_run_telemetry: list[list[dict]] | None,
+    model_snapshot: str,
+) -> DimensionScore:
+    """
+    Per-case USD cost (Value bucket). Mean across reps of (sum of SDK costs
+    across agent calls within one rep). Uses SDK total_cost_usd when present;
+    falls back to tokens × pinned rates for paths that don't surface cost.
+
+    Returns N/A when telemetry is empty (unit mode, or mocked SDK in tests).
+    """
+    dim = "case_cost_usd"
+    target = "<$0.50"
+    if not pipeline_run_telemetry:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No SDK telemetry (live mode required).",
+            bucket=BUCKET_VALUE,
+        )
+    agent_rates = _MODEL_RATES_USD_PER_M.get(model_snapshot)
+    if not agent_rates:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes=f"No pricing data for {model_snapshot!r}.",
+            bucket=BUCKET_VALUE,
+        )
+    rep_costs: list[float] = []
+    for rep in pipeline_run_telemetry:
+        if not isinstance(rep, list) or not rep:
+            continue
+        rep_cost = 0.0
+        for call in rep:
+            sdk_cost = call.get("total_cost_usd")
+            if isinstance(sdk_cost, (int, float)):
+                rep_cost += float(sdk_cost)
+                continue
+            in_tok  = call.get("input_tokens") or 0
+            out_tok = call.get("output_tokens") or 0
+            rep_cost += (
+                in_tok  * agent_rates["input"]  / 1_000_000 +
+                out_tok * agent_rates["output"] / 1_000_000
+            )
+        if rep_cost > 0:
+            rep_costs.append(rep_cost)
+    if not rep_costs:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No reps had SDK telemetry with cost data.",
+            bucket=BUCKET_VALUE,
+        )
+    avg = sum(rep_costs) / len(rep_costs)
+    return DimensionScore(
+        dimension=dim,
+        score=avg,
+        target=target,
+        passed=avg < 0.50,
+        notes=(
+            f"~${avg:.4f}/case (mean over {len(rep_costs)} reps with telemetry; "
+            f"model={model_snapshot}). REAL SDK cost."
+        ),
+        bucket=BUCKET_VALUE,
+    )
+
+
+def score_case_wall_time_seconds(
+    pipeline_run_wall_seconds: list[float] | None,
+) -> DimensionScore:
+    """
+    Per-case wall time (Operational bucket). Mean across the case's reps.
+    Maps to TAT proxy at the per-case granularity — pairs with the aggregate
+    p50/p90 dims that report suite-wide percentiles.
+    """
+    dim = "case_wall_time_seconds"
+    target = "<60s"
+    if not pipeline_run_wall_seconds:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No wall-time data (live mode required).",
+            bucket=BUCKET_OPERATIONAL,
+        )
+    valid = [t for t in pipeline_run_wall_seconds if isinstance(t, (int, float)) and t > 0]
+    if not valid:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No valid wall-time samples.",
+            bucket=BUCKET_OPERATIONAL,
+        )
+    avg = sum(valid) / len(valid)
+    return DimensionScore(
+        dimension=dim,
+        score=avg,
+        target=target,
+        passed=avg < 60.0,
+        notes=f"mean={avg:.1f}s over {len(valid)} reps.",
+        bucket=BUCKET_OPERATIONAL,
+    )
+
+
+def score_case_completion_rate(
+    pipeline_run_statuses: list[str] | None,
+) -> DimensionScore:
+    """
+    Per-case completion rate (Operational bucket). Fraction of this case's
+    reps that returned status='completed' (vs escalated/failed). Surfaces
+    case-specific stability issues — e.g., the Opus reasoning_drafter JSON
+    parse failures showed up as low case_completion_rate on specific cases.
+    """
+    dim = "case_completion_rate"
+    target = ">=0.95"
+    if not pipeline_run_statuses:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No status data (live mode required).",
+            bucket=BUCKET_OPERATIONAL,
+        )
+    total = len(pipeline_run_statuses)
+    completed = sum(1 for s in pipeline_run_statuses if s == "completed")
+    rate = completed / total if total > 0 else 0.0
+    return DimensionScore(
+        dimension=dim,
+        score=rate,
+        target=target,
+        passed=rate >= 0.95,
+        notes=f"{completed}/{total} reps completed.",
+        bucket=BUCKET_OPERATIONAL,
+    )
+
+
+# ---------------------------------------------------------------------------
 # 5. Adversarial Gate-Bypass Rate (AGGREGATE)
 # ---------------------------------------------------------------------------
 

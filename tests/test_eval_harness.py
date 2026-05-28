@@ -281,8 +281,11 @@ def test_run_eval_unit_mode():
     for case in per_case:
         assert isinstance(case, EvalCase)
         assert isinstance(case.dimension_scores, list)
-        # Per-case has exactly 4 dims (2 computable in unit mode + 2 deferred)
-        assert len(case.dimension_scores) == 4
+        # Per-case has exactly 7 dims after the 2026-05-28 per-case Value/Operational
+        # additions: 2 computable in unit mode (source_citation, ai_decision_limit) +
+        # 2 deferred-in-unit (rationale_faithfulness, decision_reproducibility) +
+        # 3 telemetry-driven (case_cost_usd, case_wall_time_seconds, case_completion_rate)
+        assert len(case.dimension_scores) == 7
     # 18 aggregate dimensions after eval framework v3 + cohens removal + per-case
     # roll-ups (Fix B — 2026-05-28). Roll-ups close the dashboard 18-vs-14 gap:
     #   - 3 scope §7 originals (cohens_kappa removed — see SCOPE_DELTAS)
@@ -297,10 +300,15 @@ def test_run_eval_unit_mode():
 def test_run_eval_unit_mode_per_case_dim_names():
     per_case, _ = run_eval(live=False)
     expected_dim_names = {
+        # Behavioral per-case (Trust + Operational)
         "source_citation_accuracy",
         "ai_decision_limit",
         "rationale_faithfulness",
         "decision_reproducibility",
+        # Telemetry-driven per-case (Value + Operational; 2026-05-28)
+        "case_cost_usd",
+        "case_wall_time_seconds",
+        "case_completion_rate",
     }
     for case in per_case:
         actual = {ds.dimension for ds in case.dimension_scores}
