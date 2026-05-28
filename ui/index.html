@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GPA v4 · Audit Log</title>
+  <title>GPA v4 · Dashboard</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -12,482 +12,462 @@
       background: #f5f6f8;
       color: #1a1d23;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
     }
 
     header {
       background: #fff;
       border-bottom: 1px solid #e2e5ea;
-      padding: 18px 24px;
-      flex-shrink: 0;
+      padding: 24px 32px;
     }
 
     header h1 {
-      font-size: 1.2rem;
+      font-size: 1.4rem;
       font-weight: 700;
       color: #1a1d23;
       letter-spacing: -0.01em;
     }
 
-    header p {
-      font-size: 0.8rem;
+    header p.tagline {
+      font-size: 0.92rem;
+      color: #4b5563;
+      margin-top: 6px;
+      max-width: 720px;
+      line-height: 1.5;
+    }
+
+    .status-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    .pill.ok       { background: #dcfce7; color: #15803d; }
+    .pill.warn     { background: #fef3c7; color: #92400e; }
+    .pill.info     { background: #dbeafe; color: #1d4ed8; }
+    .pill.muted    { background: #f3f4f6; color: #6b7280; }
+
+    main {
+      padding: 28px 32px;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .row {
+      display: grid;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .row.two-col { grid-template-columns: 1fr 1fr; }
+
+    @media (max-width: 800px) {
+      .row.two-col { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e2e5ea;
+      border-radius: 10px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card.hero {
+      background: linear-gradient(135deg, #eff6ff 0%, #fafbff 100%);
+      border-color: #c7d2fe;
+    }
+
+    .card h2 {
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: #1a1d23;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card .badge-hero {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      background: #2563eb;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .card p.desc {
+      font-size: 0.88rem;
+      color: #4b5563;
+      line-height: 1.55;
+    }
+
+    .card .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 9px 18px;
+      border-radius: 6px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: 0;
+    }
+
+    .btn.primary  { background: #2563eb; color: #fff; }
+    .btn.secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+    .btn:hover { filter: brightness(0.95); }
+
+    .stat-row {
+      display: flex;
+      gap: 24px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      font-size: 0.78rem;
       color: #6b7280;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1a1d23;
       margin-top: 2px;
     }
 
-    /* ---- Two-column layout ---- */
-    .layout {
-      display: flex;
-      flex: 1;
-      min-height: 0;
+    .eval-headlines {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 4px;
     }
 
-    /* ---- Sidebar ---- */
-    aside {
-      width: 280px;
-      flex-shrink: 0;
-      background: #fff;
-      border-right: 1px solid #e2e5ea;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .sidebar-header {
-      padding: 12px 16px;
-      border-bottom: 1px solid #e2e5ea;
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #6b7280;
+    .eval-headline {
+      padding: 10px 14px;
       background: #f9fafb;
-    }
-
-    .case-list {
-      flex: 1;
-      overflow-y: auto;
-    }
-
-    .case-item {
-      padding: 12px 16px;
-      border-bottom: 1px solid #f0f1f3;
-      cursor: pointer;
-      transition: background 0.1s;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .case-item:hover { background: #f0f7ff; }
-
-    .case-item.active {
-      background: #eff6ff;
-      border-left: 3px solid #3b82f6;
-      padding-left: 13px;
-    }
-
-    .case-item-id {
-      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #1a1d23;
-    }
-
-    .case-item-sub {
-      font-size: 0.72rem;
-      color: #6b7280;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* ---- Main audit panel ---- */
-    .audit-panel {
-      flex: 1;
-      padding: 24px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .audit-panel-title {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #6b7280;
-    }
-
-    .audit-panel-case {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #1a1d23;
-    }
-
-    /* ---- Audit record cards ---- */
-    .record-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .record-card {
-      background: #fff;
       border: 1px solid #e2e5ea;
-      border-radius: 8px;
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      border-radius: 6px;
     }
 
-    /* type-specific left border */
-    .record-card.type-agent_event         { border-left: 4px solid #3b82f6; }
-    .record-card.type-pre_state_record    { border-left: 4px solid #a855f7; }
-    .record-card.type-nurse_action_record { border-left: 4px solid #22c55e; }
-
-    .record-top {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .record-type-badge {
-      padding: 2px 10px;
-      border-radius: 99px;
-      font-size: 0.68rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
-    }
-
-    .badge-agent_event         { background: #dbeafe; color: #1d4ed8; }
-    .badge-pre_state_record    { background: #f3e8ff; color: #7e22ce; }
-    .badge-nurse_action_record { background: #dcfce7; color: #15803d; }
-
-    .agent-name {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #1a1d23;
-    }
-
-    .record-time {
-      font-size: 0.72rem;
-      color: #9ca3af;
-      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
-      margin-left: auto;
-    }
-
-    .record-fields {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .record-field {
-      font-size: 0.78rem;
-      color: #374151;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .field-key {
+    .eval-headline .dim-name {
+      font-size: 0.7rem;
       font-weight: 600;
       color: #6b7280;
-      min-width: 110px;
-      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
     }
 
-    .field-value {
-      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
-      font-size: 0.72rem;
+    .eval-headline .dim-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1a1d23;
+      margin-top: 4px;
+    }
+
+    .eval-headline.pass .dim-value { color: #15803d; }
+    .eval-headline.fail .dim-value { color: #b91c1c; }
+    .eval-headline.na   .dim-value { color: #9ca3af; }
+
+    .reviewer-card {
+      background: #fafbfc;
+      border: 1px dashed #d1d5db;
+    }
+
+    .reviewer-card h2 {
       color: #374151;
-      word-break: break-all;
     }
 
-    .tool-calls {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
+    .reviewer-card ul {
+      list-style: none;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 8px 24px;
+      font-size: 0.85rem;
+      color: #4b5563;
     }
 
-    .tool-call-pill {
-      background: #e0f2fe;
-      color: #0369a1;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.68rem;
-      font-weight: 500;
+    .reviewer-card li {
+      padding: 3px 0;
+    }
+
+    .reviewer-card code {
       font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+      font-size: 0.78rem;
+      color: #1f2937;
+      background: #fff;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid #e2e5ea;
     }
 
-    /* ---- Status badge ---- */
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 99px;
-      font-size: 0.65rem;
-      font-weight: 600;
-    }
-
-    .badge-pending_review  { background: #dbeafe; color: #1d4ed8; }
-    .badge-approved        { background: #dcfce7; color: #15803d; }
-    .badge-escalated       { background: #ffedd5; color: #c2410c; }
-    .badge-pended          { background: #f3f4f6; color: #6b7280; }
-
-    .empty-audit {
+    footer {
+      padding: 16px 32px;
       color: #9ca3af;
-      font-size: 0.875rem;
-      font-style: italic;
-      padding: 16px 0;
+      font-size: 0.78rem;
+      text-align: center;
     }
 
-    .record-count {
-      font-size: 0.75rem;
-      color: #9ca3af;
+    footer a {
+      color: #6b7280;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>GPA v4 · Audit Log</h1>
-  <p>Governance reviewer view — all cases and their AI agent audit trails</p>
+  <h1>GPA v4 · Governed Prior Authorization</h1>
+  <p class="tagline">
+    Nurse-anchored, runtime-governed AI assistance for judgment-intensive
+    prior authorization. Five hard control gates enforce the AI-Assists /
+    Human-Decides pattern architecturally. Phase 2 MVP.
+  </p>
+  <div class="status-row" id="status-row">
+    <span class="pill muted">Loading…</span>
+  </div>
 </header>
 
-<div class="layout">
-  <aside>
-    <div class="sidebar-header">Cases</div>
-    <div class="case-list" id="case-list"></div>
-  </aside>
+<main>
 
-  <div class="audit-panel" id="audit-panel">
-    <p style="color:#9ca3af;font-size:0.875rem;">Select a case to view its audit log.</p>
+  <!-- HERO: Pipeline Trace -->
+  <div class="row">
+    <div class="card hero">
+      <h2>Pipeline Trace <span class="badge-hero">START HERE</span></h2>
+      <p class="desc">
+        Watch the architecture run live on a real case: 5 hard control gates,
+        4 agents, bilateral logger, every stage's input and output. About 30
+        seconds of real compute, 10 cards of evidence.
+      </p>
+      <div class="actions">
+        <a href="pipeline_trace.html?case_id=case_0001" class="btn primary">Trace case_0001 (clean) →</a>
+        <a href="pipeline_trace.html?case_id=case_0006" class="btn primary">Trace case_0006 (adversarial) →</a>
+        <a href="pipeline_trace.html" class="btn secondary">Pick a case →</a>
+      </div>
+    </div>
   </div>
-</div>
+
+  <!-- Nurse + Physician queues -->
+  <div class="row two-col">
+    <div class="card">
+      <h2>Nurse Queue</h2>
+      <p class="desc">
+        Reviewer-side workflow. Cases visible only after the pipeline has run.
+        Nurse opens a case, reads the AI brief, then approves / escalates / pends
+        — the AI never decides.
+      </p>
+      <div class="stat-row">
+        <div class="stat">Pending cases<strong id="nurse-count">—</strong></div>
+      </div>
+      <div class="actions">
+        <a href="queue.html" class="btn primary">Open nurse queue →</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Physician Queue</h2>
+      <p class="desc">
+        Peer review when nurse escalates. Denial authority sits with a licensed
+        clinician — never the nurse alone, never the AI. Every action requires
+        clinical basis + guideline citation + evidence gaps.
+      </p>
+      <div class="stat-row">
+        <div class="stat">Pending cases<strong id="physician-count">—</strong></div>
+      </div>
+      <div class="actions">
+        <a href="physician_queue.html" class="btn primary">Open physician queue →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Eval Report -->
+  <div class="row">
+    <div class="card">
+      <h2>Eval Report (v2 — RAI-aligned, 12 dims)</h2>
+      <p class="desc">
+        Twelve dimensions across the six Responsible AI evaluation categories
+        (safety, grounding, policy compliance, HITL, explainability, fairness).
+        Cross-vendor judge (GPT-4o pinned snapshot) to avoid self-grading bias.
+      </p>
+      <div id="eval-summary">
+        <p class="desc" style="font-style:italic;color:#9ca3af;">Loading latest eval report…</p>
+      </div>
+      <div class="actions">
+        <a id="full-report-link" href="#" class="btn primary" target="_blank">View full report ↗</a>
+        <a href="audit.html" class="btn secondary">Audit log →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- For the reviewer -->
+  <div class="row">
+    <div class="card reviewer-card">
+      <h2>For the reviewer</h2>
+      <p class="desc">PM artifacts that document the strategic intent, the scope discipline, and the architectural decisions.</p>
+      <ul>
+        <li>Strategic thesis → <code>docs/SCOPE_BASELINE.md</code></li>
+        <li>Scope decisions (cuts + additions) → <code>docs/SCOPE_DELTAS.md</code></li>
+        <li>Phase 3 plan → <code>docs/PHASE_3_BACKLOG.md</code></li>
+        <li>Eval narrative → <code>docs/EVAL_WRITEUP.md</code></li>
+        <li>Eval methodology → <code>docs/eval-methodology.md</code></li>
+        <li>Loom recording script → <code>docs/LOOM_SCRIPT.md</code></li>
+        <li>Architecture decisions → 19 ADRs in <code>docs/adr/</code></li>
+        <li>Changelog → <code>CHANGELOG.md</code></li>
+      </ul>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  GPA v4 · Phase 2 MVP · API on :8000 · UI on :8001 ·
+  <a href="audit.html">Audit log</a>
+</footer>
 
 <script>
-/* ------------------------------------------------------------------ */
-/*  Live data from the API (was fixtures; rewired 2026-05-27 for Loom)  */
-/* ------------------------------------------------------------------ */
-// API_BASE: the FastAPI server is on port 8000; the static UI is on 8001.
-  // We deliberately do NOT use window.location.origin here — that resolves to
-  // the UI server (8001) which doesn't host the API. Override at runtime by
-  // setting window.GPA_API_BASE before this script loads.
   const API_BASE = window.GPA_API_BASE || "http://" + window.location.hostname + ":8000";
-let AUDIT_CASES = [];   // populated from GET /api/v1/audit/cases
-const AUDIT_LOGS = {};  // populated lazily per-case from GET /api/v1/audit/case/{id}
 
-async function loadAuditCases() {
-  try {
-    const res = await fetch(`${API_BASE}/api/v1/audit/cases`);
-    if (!res.ok) {
-      console.error("audit cases HTTP", res.status);
-      return [];
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[ch]);
+  }
+
+  async function loadStatus() {
+    const row = document.getElementById("status-row");
+    row.innerHTML = "";
+
+    async function pill(text, cls = "muted") {
+      const span = document.createElement("span");
+      span.className = `pill ${cls}`;
+      span.textContent = text;
+      row.appendChild(span);
     }
-    const data = await res.json();
-    return (data.cases || []).map(c => ({
-      case_id: c.case_id,
-      patient_id: "—",
-      submitted_at: null,
-      status: c.current_status || "pending_review",
-    }));
-  } catch (err) {
-    console.error("audit cases fetch failed:", err);
-    return [];
-  }
-}
 
-async function loadAuditLog(caseId) {
-  if (AUDIT_LOGS[caseId]) return AUDIT_LOGS[caseId];
-  try {
-    const res = await fetch(`${API_BASE}/api/v1/audit/case/${encodeURIComponent(caseId)}`);
-    if (!res.ok) {
-      console.error("audit log HTTP", res.status, "for", caseId);
-      return [];
+    // API health
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/health`);
+      if (r.ok) pill("API healthy ✓", "ok");
+      else pill(`API unreachable (${r.status})`, "warn");
+    } catch (err) {
+      pill("API unreachable", "warn");
     }
-    const data = await res.json();
-    AUDIT_LOGS[caseId] = data.events || [];
-    return AUDIT_LOGS[caseId];
-  } catch (err) {
-    console.error("audit log fetch failed:", err);
-    return [];
-  }
-}
 
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                             */
-/* ------------------------------------------------------------------ */
-function esc(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+    // Nurse queue
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/nurse/queue`);
+      const d = await r.json();
+      pill(`${d.total} cases in queue`, "info");
+      document.getElementById("nurse-count").textContent = d.total;
+    } catch (err) {
+      pill("Nurse queue unavailable", "warn");
+    }
 
-function formatTime(iso) {
-  const d = new Date(iso);
-  return d.toLocaleString("en-US", {
-    month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-    hour12: false, timeZoneName: "short"
-  });
-}
+    // Physician queue
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/physician/queue`);
+      const d = await r.json();
+      const cls = d.pending_count > 0 ? "warn" : "muted";
+      pill(`${d.pending_count} pending physician review`, cls);
+      document.getElementById("physician-count").textContent = d.pending_count;
+    } catch (err) {
+      pill("Physician queue unavailable", "warn");
+    }
 
-/* ------------------------------------------------------------------ */
-/*  Sidebar                                                             */
-/* ------------------------------------------------------------------ */
-function renderSidebar(selectedId) {
-  const list = document.getElementById("case-list");
-  list.innerHTML = AUDIT_CASES.map(c => `
-    <div class="case-item ${c.case_id === selectedId ? "active" : ""}"
-         onclick="selectCase('${esc(c.case_id)}')">
-      <span class="case-item-id">${esc(c.case_id)}</span>
-      <div class="case-item-sub">
-        <span>${esc(c.patient_id)}</span>
-        <span class="badge badge-${c.status}">${c.status.replace(/_/g, " ")}</span>
-      </div>
-    </div>
-  `).join("");
-}
+    // Audit log
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/audit/cases`);
+      const d = await r.json();
+      pill(`${d.total} audit log entries`, "muted");
+    } catch (err) {}
 
-/* ------------------------------------------------------------------ */
-/*  Record card renderer                                                */
-/* ------------------------------------------------------------------ */
-function renderRecord(rec) {
-  const typeBadge = `<span class="record-type-badge badge-${rec.type}">${esc(rec.type.replace(/_/g, " "))}</span>`;
-  const agentLabel = rec.agent ? `<span class="agent-name">${esc(rec.agent)}</span>` : "";
-  const timeLabel  = `<span class="record-time">${esc(formatTime(rec.at))}</span>`;
-
-  const fields = [];
-
-  if (rec.output_hash) {
-    fields.push(`
-      <div class="record-field">
-        <span class="field-key">output_hash</span>
-        <span class="field-value">${esc(rec.output_hash)}</span>
-      </div>
-    `);
+    // Eval framework version
+    pill("Eval v2 (12 dims, RAI-aligned)", "info");
   }
 
-  if (rec.reasoning_brief_hash) {
-    fields.push(`
-      <div class="record-field">
-        <span class="field-key">reasoning_brief_hash</span>
-        <span class="field-value">${esc(rec.reasoning_brief_hash)}</span>
-      </div>
-    `);
-  }
+  async function loadEvalSummary() {
+    const container = document.getElementById("eval-summary");
+    const linkEl = document.getElementById("full-report-link");
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/eval/latest`);
+      const d = await r.json();
+      if (!d.found) {
+        container.innerHTML = `<p class="desc">No eval reports yet. Run: <code>SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/save_report.py</code></p>`;
+        linkEl.style.display = "none";
+        return;
+      }
 
-  if (rec.tool_calls_made && rec.tool_calls_made.length > 0) {
-    const pills = rec.tool_calls_made.map(t => `<span class="tool-call-pill">${esc(t)}</span>`).join("");
-    fields.push(`
-      <div class="record-field">
-        <span class="field-key">tool_calls_made</span>
-        <div class="tool-calls">${pills}</div>
-      </div>
-    `);
-  }
+      // Build the headline display
+      const summary = [];
+      if (d.cases_run) summary.push(`<strong>${d.cases_run}</strong> cases run`);
+      if (d.per_case_pass) summary.push(`<strong>${d.per_case_pass.passed}/${d.per_case_pass.total}</strong> passing per-case`);
+      if (d.aggregate_pass) summary.push(`<strong>${d.aggregate_pass.passed}/${d.aggregate_pass.total}</strong> aggregate dims passing`);
 
-  // Any remaining keys
-  const knownKeys = new Set(["type","agent","at","output_hash","reasoning_brief_hash","tool_calls_made"]);
-  for (const [k, v] of Object.entries(rec)) {
-    if (!knownKeys.has(k)) {
-      fields.push(`
-        <div class="record-field">
-          <span class="field-key">${esc(k)}</span>
-          <span class="field-value">${esc(JSON.stringify(v))}</span>
-        </div>
-      `);
+      // Build per-dim grid (just the most important ones)
+      const showDims = new Set([
+        "ai_decision_limit",
+        "source_citation_accuracy",
+        "adversarial_gate_bypass_rate",
+        "false_escalation_rate",
+        "citation_correctness",
+        "bias_disparity",
+      ]);
+      const headlineCards = d.aggregate_dims
+        .filter(dim => showDims.has(dim.dimension))
+        .map(dim => {
+          const cls = dim.status.includes("✓") ? "pass"
+                    : dim.status.includes("✗") ? "fail"
+                    : "na";
+          return `
+            <div class="eval-headline ${cls}">
+              <div class="dim-name">${esc(dim.dimension)}</div>
+              <div class="dim-value">${esc(dim.score)}</div>
+            </div>
+          `;
+        }).join("");
+
+      container.innerHTML = `
+        <p class="desc" style="margin-bottom:8px;">
+          Latest run: <strong>${esc(d.generated || "—")}</strong> · Mode: <strong>${esc(d.mode || "—")}</strong>
+          <br>${summary.join(" · ")}
+        </p>
+        <div class="eval-headlines">${headlineCards}</div>
+      `;
+
+      // Wire the full-report link — opens via the static UI server
+      linkEl.href = `eval_report_view.html?file=${encodeURIComponent(d.filename)}`;
+      linkEl.target = "_self";
+    } catch (err) {
+      container.innerHTML = `<p class="desc">Could not load eval summary: ${esc(err)}</p>`;
     }
   }
 
-  return `
-    <div class="record-card type-${rec.type}">
-      <div class="record-top">
-        ${typeBadge}
-        ${agentLabel}
-        ${timeLabel}
-      </div>
-      ${fields.length ? `<div class="record-fields">${fields.join("")}</div>` : ""}
-    </div>
-  `;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Audit panel renderer                                                */
-/* ------------------------------------------------------------------ */
-async function renderAuditPanel(caseId) {
-  const panel = document.getElementById("audit-panel");
-  const caseData = AUDIT_CASES.find(c => c.case_id === caseId);
-
-  if (!caseData) {
-    panel.innerHTML = `<p class="empty-audit">Case not found.</p>`;
-    return;
-  }
-
-  panel.innerHTML = `<p class="empty-audit">Loading…</p>`;
-  const logs = await loadAuditLog(caseId);
-
-  const headerHTML = `
-    <div>
-      <p class="audit-panel-title">Audit Log</p>
-      <p class="audit-panel-case">${esc(caseId)}</p>
-    </div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-      <span style="font-size:0.78rem;color:#6b7280;">Patient: <strong>${esc(caseData.patient_id || "—")}</strong></span>
-      <span class="badge badge-${caseData.status}">${String(caseData.status).replace(/_/g," ")}</span>
-    </div>
-    <div style="height:1px;background:#e2e5ea;"></div>
-  `;
-
-  if (logs.length === 0) {
-    panel.innerHTML = headerHTML + `<p class="empty-audit">No audit records for this case.</p>`;
-    return;
-  }
-
-  const recordsHTML = logs.map(renderRecord).join("");
-  panel.innerHTML = headerHTML + `
-    <div style="display:flex;align-items:center;gap:8px;">
-      <p class="audit-panel-title">Agent Events</p>
-      <span class="record-count">${logs.length} records</span>
-    </div>
-    <div class="record-list">${recordsHTML}</div>
-  `;
-}
-
-/* ------------------------------------------------------------------ */
-/*  State                                                               */
-/* ------------------------------------------------------------------ */
-let selectedCaseId = null;
-
-function selectCase(caseId) {
-  selectedCaseId = caseId;
-  renderSidebar(caseId);
-  renderAuditPanel(caseId);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Init                                                                */
-/* ------------------------------------------------------------------ */
-async function init() {
-  document.getElementById("audit-panel").innerHTML = `<p class="empty-audit">Loading cases…</p>`;
-  AUDIT_CASES = await loadAuditCases();
-  renderSidebar(null);
-  if (AUDIT_CASES.length > 0) {
-    selectCase(AUDIT_CASES[0].case_id);
-  } else {
-    document.getElementById("audit-panel").innerHTML = `<p class="empty-audit">No cases in the audit log yet. Run a case through /api/v1/pa/decide and refresh.</p>`;
-  }
-}
-
-init();
+  loadStatus();
+  loadEvalSummary();
 </script>
 
 </body>

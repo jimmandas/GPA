@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPA v4 · Audit Log</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f6f8;
+      color: #1a1d23;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e2e5ea;
+      padding: 18px 24px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #1a1d23;
+      letter-spacing: -0.01em;
+    }
+
+    header p {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    /* ---- Two-column layout ---- */
+    .layout {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ---- Sidebar ---- */
+    aside {
+      width: 280px;
+      flex-shrink: 0;
+      background: #fff;
+      border-right: 1px solid #e2e5ea;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e2e5ea;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      background: #f9fafb;
+    }
+
+    .case-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .case-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f1f3;
+      cursor: pointer;
+      transition: background 0.1s;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .case-item:hover { background: #f0f7ff; }
+
+    .case-item.active {
+      background: #eff6ff;
+      border-left: 3px solid #3b82f6;
+      padding-left: 13px;
+    }
+
+    .case-item-id {
+      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #1a1d23;
+    }
+
+    .case-item-sub {
+      font-size: 0.72rem;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ---- Main audit panel ---- */
+    .audit-panel {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .audit-panel-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+    }
+
+    .audit-panel-case {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1d23;
+    }
+
+    /* ---- Audit record cards ---- */
+    .record-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .record-card {
+      background: #fff;
+      border: 1px solid #e2e5ea;
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* type-specific left border */
+    .record-card.type-agent_event         { border-left: 4px solid #3b82f6; }
+    .record-card.type-pre_state_record    { border-left: 4px solid #a855f7; }
+    .record-card.type-nurse_action_record { border-left: 4px solid #22c55e; }
+
+    .record-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .record-type-badge {
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .badge-agent_event         { background: #dbeafe; color: #1d4ed8; }
+    .badge-pre_state_record    { background: #f3e8ff; color: #7e22ce; }
+    .badge-nurse_action_record { background: #dcfce7; color: #15803d; }
+
+    .agent-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #1a1d23;
+    }
+
+    .record-time {
+      font-size: 0.72rem;
+      color: #9ca3af;
+      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+      margin-left: auto;
+    }
+
+    .record-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .record-field {
+      font-size: 0.78rem;
+      color: #374151;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .field-key {
+      font-weight: 600;
+      color: #6b7280;
+      min-width: 110px;
+      flex-shrink: 0;
+    }
+
+    .field-value {
+      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+      font-size: 0.72rem;
+      color: #374151;
+      word-break: break-all;
+    }
+
+    .tool-calls {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tool-call-pill {
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 500;
+      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+    }
+
+    /* ---- Status badge ---- */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 0.65rem;
+      font-weight: 600;
+    }
+
+    .badge-pending_review  { background: #dbeafe; color: #1d4ed8; }
+    .badge-approved        { background: #dcfce7; color: #15803d; }
+    .badge-escalated       { background: #ffedd5; color: #c2410c; }
+    .badge-pended          { background: #f3f4f6; color: #6b7280; }
+
+    .empty-audit {
+      color: #9ca3af;
+      font-size: 0.875rem;
+      font-style: italic;
+      padding: 16px 0;
+    }
+
+    .record-count {
+      font-size: 0.75rem;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+
+<header style="display:flex;justify-content:space-between;align-items:flex-start;">
+  <div>
+    <h1>GPA v4 · Audit Log</h1>
+    <p>Governance reviewer view — all cases and their AI agent audit trails</p>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="index.html" style="background:#6b7280;color:#fff;text-decoration:none;padding:8px 14px;border-radius:6px;font-size:0.82rem;font-weight:600;">← Dashboard</a>
+    <a href="pipeline_trace.html" style="background:#2563eb;color:#fff;text-decoration:none;padding:8px 14px;border-radius:6px;font-size:0.82rem;font-weight:600;">Pipeline Trace →</a>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="sidebar-header">Cases</div>
+    <div class="case-list" id="case-list"></div>
+  </aside>
+
+  <div class="audit-panel" id="audit-panel">
+    <p style="color:#9ca3af;font-size:0.875rem;">Select a case to view its audit log.</p>
+  </div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ */
+/*  Live data from the API (was fixtures; rewired 2026-05-27 for Loom)  */
+/* ------------------------------------------------------------------ */
+// API_BASE: the FastAPI server is on port 8000; the static UI is on 8001.
+  // We deliberately do NOT use window.location.origin here — that resolves to
+  // the UI server (8001) which doesn't host the API. Override at runtime by
+  // setting window.GPA_API_BASE before this script loads.
+  const API_BASE = window.GPA_API_BASE || "http://" + window.location.hostname + ":8000";
+let AUDIT_CASES = [];   // populated from GET /api/v1/audit/cases
+const AUDIT_LOGS = {};  // populated lazily per-case from GET /api/v1/audit/case/{id}
+
+async function loadAuditCases() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/audit/cases`);
+    if (!res.ok) {
+      console.error("audit cases HTTP", res.status);
+      return [];
+    }
+    const data = await res.json();
+    return (data.cases || []).map(c => ({
+      case_id: c.case_id,
+      patient_id: "—",
+      submitted_at: null,
+      status: c.current_status || "pending_review",
+    }));
+  } catch (err) {
+    console.error("audit cases fetch failed:", err);
+    return [];
+  }
+}
+
+async function loadAuditLog(caseId) {
+  if (AUDIT_LOGS[caseId]) return AUDIT_LOGS[caseId];
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/audit/case/${encodeURIComponent(caseId)}`);
+    if (!res.ok) {
+      console.error("audit log HTTP", res.status, "for", caseId);
+      return [];
+    }
+    const data = await res.json();
+    AUDIT_LOGS[caseId] = data.events || [];
+    return AUDIT_LOGS[caseId];
+  } catch (err) {
+    console.error("audit log fetch failed:", err);
+    return [];
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                             */
+/* ------------------------------------------------------------------ */
+function esc(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString("en-US", {
+    month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false, timeZoneName: "short"
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sidebar                                                             */
+/* ------------------------------------------------------------------ */
+function renderSidebar(selectedId) {
+  const list = document.getElementById("case-list");
+  list.innerHTML = AUDIT_CASES.map(c => `
+    <div class="case-item ${c.case_id === selectedId ? "active" : ""}"
+         onclick="selectCase('${esc(c.case_id)}')">
+      <span class="case-item-id">${esc(c.case_id)}</span>
+      <div class="case-item-sub">
+        <span>${esc(c.patient_id)}</span>
+        <span class="badge badge-${c.status}">${c.status.replace(/_/g, " ")}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Record card renderer                                                */
+/* ------------------------------------------------------------------ */
+function renderRecord(rec) {
+  const typeBadge = `<span class="record-type-badge badge-${rec.type}">${esc(rec.type.replace(/_/g, " "))}</span>`;
+  const agentLabel = rec.agent ? `<span class="agent-name">${esc(rec.agent)}</span>` : "";
+  const timeLabel  = `<span class="record-time">${esc(formatTime(rec.at))}</span>`;
+
+  const fields = [];
+
+  if (rec.output_hash) {
+    fields.push(`
+      <div class="record-field">
+        <span class="field-key">output_hash</span>
+        <span class="field-value">${esc(rec.output_hash)}</span>
+      </div>
+    `);
+  }
+
+  if (rec.reasoning_brief_hash) {
+    fields.push(`
+      <div class="record-field">
+        <span class="field-key">reasoning_brief_hash</span>
+        <span class="field-value">${esc(rec.reasoning_brief_hash)}</span>
+      </div>
+    `);
+  }
+
+  if (rec.tool_calls_made && rec.tool_calls_made.length > 0) {
+    const pills = rec.tool_calls_made.map(t => `<span class="tool-call-pill">${esc(t)}</span>`).join("");
+    fields.push(`
+      <div class="record-field">
+        <span class="field-key">tool_calls_made</span>
+        <div class="tool-calls">${pills}</div>
+      </div>
+    `);
+  }
+
+  // Any remaining keys
+  const knownKeys = new Set(["type","agent","at","output_hash","reasoning_brief_hash","tool_calls_made"]);
+  for (const [k, v] of Object.entries(rec)) {
+    if (!knownKeys.has(k)) {
+      fields.push(`
+        <div class="record-field">
+          <span class="field-key">${esc(k)}</span>
+          <span class="field-value">${esc(JSON.stringify(v))}</span>
+        </div>
+      `);
+    }
+  }
+
+  return `
+    <div class="record-card type-${rec.type}">
+      <div class="record-top">
+        ${typeBadge}
+        ${agentLabel}
+        ${timeLabel}
+      </div>
+      ${fields.length ? `<div class="record-fields">${fields.join("")}</div>` : ""}
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Audit panel renderer                                                */
+/* ------------------------------------------------------------------ */
+async function renderAuditPanel(caseId) {
+  const panel = document.getElementById("audit-panel");
+  const caseData = AUDIT_CASES.find(c => c.case_id === caseId);
+
+  if (!caseData) {
+    panel.innerHTML = `<p class="empty-audit">Case not found.</p>`;
+    return;
+  }
+
+  panel.innerHTML = `<p class="empty-audit">Loading…</p>`;
+  const logs = await loadAuditLog(caseId);
+
+  const headerHTML = `
+    <div>
+      <p class="audit-panel-title">Audit Log</p>
+      <p class="audit-panel-case">${esc(caseId)}</p>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:0.78rem;color:#6b7280;">Patient: <strong>${esc(caseData.patient_id || "—")}</strong></span>
+      <span class="badge badge-${caseData.status}">${String(caseData.status).replace(/_/g," ")}</span>
+    </div>
+    <div style="height:1px;background:#e2e5ea;"></div>
+  `;
+
+  if (logs.length === 0) {
+    panel.innerHTML = headerHTML + `<p class="empty-audit">No audit records for this case.</p>`;
+    return;
+  }
+
+  const recordsHTML = logs.map(renderRecord).join("");
+  panel.innerHTML = headerHTML + `
+    <div style="display:flex;align-items:center;gap:8px;">
+      <p class="audit-panel-title">Agent Events</p>
+      <span class="record-count">${logs.length} records</span>
+    </div>
+    <div class="record-list">${recordsHTML}</div>
+  `;
+}
+
+/* ------------------------------------------------------------------ */
+/*  State                                                               */
+/* ------------------------------------------------------------------ */
+let selectedCaseId = null;
+
+function selectCase(caseId) {
+  selectedCaseId = caseId;
+  renderSidebar(caseId);
+  renderAuditPanel(caseId);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Init                                                                */
+/* ------------------------------------------------------------------ */
+async function init() {
+  document.getElementById("audit-panel").innerHTML = `<p class="empty-audit">Loading cases…</p>`;
+  AUDIT_CASES = await loadAuditCases();
+  renderSidebar(null);
+  if (AUDIT_CASES.length > 0) {
+    selectCase(AUDIT_CASES[0].case_id);
+  } else {
+    document.getElementById("audit-panel").innerHTML = `<p class="empty-audit">No cases in the audit log yet. Run a case through /api/v1/pa/decide and refresh.</p>`;
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>

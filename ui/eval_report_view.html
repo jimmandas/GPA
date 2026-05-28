@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPA v4 · Eval Report</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f6f8;
+      color: #1a1d23;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e2e5ea;
+      padding: 18px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    header .filename {
+      font-family: "SF Mono", "Fira Mono", monospace;
+      font-size: 0.78rem;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    .nav-links a {
+      background: #6b7280;
+      color: #fff;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .nav-links a.primary { background: #2563eb; }
+
+    main {
+      padding: 28px 32px;
+      max-width: 1020px;
+      margin: 0 auto;
+    }
+
+    /* Markdown rendering */
+    .md-content h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-top: 28px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e2e5ea;
+    }
+
+    .md-content h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-top: 26px;
+      margin-bottom: 12px;
+      color: #1a1d23;
+    }
+
+    .md-content h3 {
+      font-size: 0.98rem;
+      font-weight: 700;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      color: #374151;
+    }
+
+    .md-content p {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: #374151;
+      margin-bottom: 10px;
+    }
+
+    .md-content table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 8px 0 18px;
+      background: #fff;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .md-content th {
+      background: #f9fafb;
+      text-align: left;
+      padding: 8px 12px;
+      font-weight: 700;
+      color: #374151;
+      border-bottom: 1px solid #e2e5ea;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .md-content td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #f0f1f3;
+      color: #374151;
+    }
+
+    .md-content tr:last-child td { border-bottom: none; }
+
+    .md-content code {
+      font-family: "SF Mono", "Fira Mono", monospace;
+      font-size: 0.82em;
+      background: #f3f4f6;
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: #1f2937;
+    }
+
+    .empty-state {
+      padding: 48px;
+      text-align: center;
+      color: #9ca3af;
+    }
+
+    .error-state {
+      padding: 20px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      border-radius: 8px;
+    }
+
+    /* Status indicators in tables */
+    .md-content td:has-text("✓") { background: rgba(220, 252, 231, 0.3); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GPA v4 · Eval Report</h1>
+    <p class="filename" id="filename">Loading…</p>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="primary">← Dashboard</a>
+    <a href="audit.html">Audit log</a>
+  </div>
+</header>
+
+<main>
+  <div class="md-content" id="md-content">
+    <p class="empty-state">Loading eval report…</p>
+  </div>
+</main>
+
+<script>
+  const API_BASE = window.GPA_API_BASE || "http://" + window.location.hostname + ":8000";
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[ch]);
+  }
+
+  // Minimal markdown renderer for eval reports.
+  // Eval reports use a constrained markdown subset (headers, tables, paragraphs),
+  // so we don't need a full md library. ~50 lines vs. 100KB+ dependency.
+  function renderMarkdown(md) {
+    const lines = md.split("\n");
+    const out = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // Heading
+      if (line.startsWith("# ")) {
+        out.push(`<h1>${esc(line.slice(2))}</h1>`);
+        i++; continue;
+      }
+      if (line.startsWith("## ")) {
+        out.push(`<h2>${esc(line.slice(3))}</h2>`);
+        i++; continue;
+      }
+      if (line.startsWith("### ")) {
+        out.push(`<h3>${esc(line.slice(4))}</h3>`);
+        i++; continue;
+      }
+
+      // Table block: lines starting with |, followed by a separator |---|---| row
+      if (line.startsWith("|") && i + 1 < lines.length && /^\|[\s\-\|]+\|$/.test(lines[i + 1])) {
+        const tableLines = [line, lines[i + 1]];
+        let j = i + 2;
+        while (j < lines.length && lines[j].startsWith("|")) {
+          tableLines.push(lines[j]);
+          j++;
+        }
+        out.push(renderTable(tableLines));
+        i = j;
+        continue;
+      }
+
+      // Horizontal rule
+      if (line.trim() === "---") {
+        out.push(`<hr style="border:0;border-top:1px solid #e2e5ea;margin:18px 0;">`);
+        i++; continue;
+      }
+
+      // Blank line
+      if (!line.trim()) { i++; continue; }
+
+      // Regular paragraph — render inline code
+      out.push(`<p>${renderInline(line)}</p>`);
+      i++;
+    }
+    return out.join("\n");
+  }
+
+  function renderTable(tableLines) {
+    const headerCells = tableLines[0].slice(1, -1).split("|").map(s => s.trim());
+    const bodyRows = tableLines.slice(2).map(row =>
+      row.slice(1, -1).split("|").map(s => s.trim())
+    );
+    let html = "<table><thead><tr>";
+    for (const h of headerCells) html += `<th>${renderInline(h)}</th>`;
+    html += "</tr></thead><tbody>";
+    for (const row of bodyRows) {
+      html += "<tr>";
+      for (const cell of row) html += `<td>${renderInline(cell)}</td>`;
+      html += "</tr>";
+    }
+    html += "</tbody></table>";
+    return html;
+  }
+
+  function renderInline(s) {
+    // Backtick code
+    let out = "";
+    let i = 0;
+    while (i < s.length) {
+      if (s[i] === "`") {
+        const end = s.indexOf("`", i + 1);
+        if (end > i) {
+          out += `<code>${esc(s.slice(i + 1, end))}</code>`;
+          i = end + 1;
+          continue;
+        }
+      }
+      // Bold **
+      if (s[i] === "*" && s[i + 1] === "*") {
+        const end = s.indexOf("**", i + 2);
+        if (end > i) {
+          out += `<strong>${esc(s.slice(i + 2, end))}</strong>`;
+          i = end + 2;
+          continue;
+        }
+      }
+      out += esc(s[i]);
+      i++;
+    }
+    return out;
+  }
+
+  async function loadReport() {
+    const params = new URLSearchParams(window.location.search);
+    let filename = params.get("file");
+    const content = document.getElementById("md-content");
+    const filenameEl = document.getElementById("filename");
+
+    try {
+      let res, data;
+      if (filename) {
+        res = await fetch(`${API_BASE}/api/v1/eval/report/${encodeURIComponent(filename)}`);
+      } else {
+        // No filename → fetch the latest and use its filename
+        res = await fetch(`${API_BASE}/api/v1/eval/latest`);
+        const latest = await res.json();
+        if (!latest.found) {
+          content.innerHTML = `<div class="error-state">No eval report found. Run: <code>SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/save_report.py</code></div>`;
+          filenameEl.textContent = "(no reports)";
+          return;
+        }
+        filename = latest.filename;
+        res = await fetch(`${API_BASE}/api/v1/eval/report/${encodeURIComponent(filename)}`);
+      }
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        content.innerHTML = `<div class="error-state">HTTP ${res.status}: ${esc(errBody.detail || res.statusText)}</div>`;
+        filenameEl.textContent = filename;
+        return;
+      }
+      data = await res.json();
+      filenameEl.textContent = data.filename;
+      content.innerHTML = renderMarkdown(data.markdown);
+    } catch (err) {
+      content.innerHTML = `<div class="error-state">Network error: ${esc(String(err))}</div>`;
+    }
+  }
+
+  loadReport();
+</script>
+
+</body>
+</html>

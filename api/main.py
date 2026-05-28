@@ -158,6 +158,173 @@ def nurse_decision(request: NurseDecisionRequest):
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Dashboard endpoints (2026-05-28)
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+
+def _parse_eval_report(md_path: pathlib.Path) -> dict[str, Any]:
+    """Extract headline numbers from a v2 eval markdown report.
+
+    Returns a structured dict for the dashboard to render. We deliberately
+    parse the markdown (not import the runner) so the dashboard can serve
+    a historical report from disk without re-running anything.
+    """
+    text = md_path.read_text(encoding="utf-8")
+
+    # Generated timestamp
+    gen_match = _re.search(r"Generated:\s*(\S+)", text)
+    generated = gen_match.group(1) if gen_match else None
+
+    # Mode (live | unit)
+    mode_match = _re.search(r"Mode:\s*(\S+)", text)
+    mode = mode_match.group(1) if mode_match else None
+
+    # Summary counts
+    cases_match = _re.search(r"Cases run:\s*(\d+)", text)
+    per_case_match = _re.search(r"Cases passing per-case dims:\s*(\d+)/(\d+)", text)
+    agg_match = _re.search(r"Aggregate dims passing:\s*(\d+)/(\d+)", text)
+
+    # Aggregate dim table — pull score + status per dim
+    aggregate_dims: list[dict[str, Any]] = []
+    in_aggregate_section = False
+    for line in text.splitlines():
+        if "## Aggregate" in line:
+            in_aggregate_section = True
+            continue
+        if in_aggregate_section and line.startswith("| ") and "|" in line[2:]:
+            # Skip header / separator rows
+            if "Dimension" in line or "---" in line:
+                continue
+            parts = [p.strip() for p in line.strip("|").split("|")]
+            if len(parts) >= 5:
+                aggregate_dims.append({
+                    "dimension": parts[0],
+                    "score": parts[1],
+                    "target": parts[2],
+                    "status": parts[3],
+                    "notes": parts[4][:200],
+                })
+
+    return {
+        "filename": md_path.name,
+        "generated": generated,
+        "mode": mode,
+        "cases_run": int(cases_match.group(1)) if cases_match else None,
+        "per_case_pass": (
+            {"passed": int(per_case_match.group(1)), "total": int(per_case_match.group(2))}
+            if per_case_match else None
+        ),
+        "aggregate_pass": (
+            {"passed": int(agg_match.group(1)), "total": int(agg_match.group(2))}
+            if agg_match else None
+        ),
+        "aggregate_dims": aggregate_dims,
+    }
+
+
+@app.get("/api/v1/eval/report/{filename}")
+def get_eval_report_raw(filename: str):
+    """Return a specific eval report's raw markdown content."""
+    # Restrict to expected filename shape; no path traversal.
+    if not _re.match(r"^eval_report_[\w\-]+\.md$", filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="filename must match eval_report_*.md",
+        )
+    path = _REPO_ROOT / "eval" / "results" / filename
+    if not path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"report not found: {filename}",
+        )
+    return {"filename": filename, "markdown": path.read_text(encoding="utf-8")}
+
+
+@app.get("/api/v1/eval/latest")
+def get_latest_eval_report():
+    """Return parsed headline numbers from the most-recent eval report on disk."""
+    results_dir = _REPO_ROOT / "eval" / "results"
+    if not results_dir.exists():
+        return {"found": False, "reason": "eval/results/ does not exist"}
+
+    candidates = sorted(
+        results_dir.glob("eval_report_*.md"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        return {"found": False, "reason": "no eval_report_*.md files in eval/results/"}
+
+    latest = candidates[0]
+    try:
+        parsed = _parse_eval_report(latest)
+    except Exception as exc:
+        return {
+            "found": True,
+            "filename": latest.name,
+            "parse_error": str(exc),
+        }
+    return {"found": True, **parsed}
+
+
+# ---------------------------------------------------------------------------
+# Admin endpoints (URL-accessed only; not linked from main dashboard)
+# ---------------------------------------------------------------------------
+
+class AdminResetRequest(BaseModel):
+    confirm: str = Field(..., description="Must equal 'yes-reset-demo'")
+
+
+@app.post("/api/v1/admin/reset-demo-data")
+def admin_reset_demo_data(request: AdminResetRequest):
+    """Clear demo-only state so the operator can re-record cleanly.
+
+    Affects:
+      - physician_queue/state.json: cleared (was holding stale `case_test` etc.)
+      - decision_log/test_*.jsonl: deleted (test debris from prior dev sessions)
+    Does NOT touch decision_log/case_*.jsonl — those are the audit artifacts.
+    """
+    if request.confirm != "yes-reset-demo":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="confirm must equal 'yes-reset-demo' to proceed.",
+        )
+
+    cleared = {"physician_queue_entries": 0, "test_decision_logs": 0}
+
+    # Reset the physician queue's state.json
+    state_path = _REPO_ROOT / "physician_queue" / "state.json"
+    if state_path.exists():
+        try:
+            existing = json.loads(state_path.read_text(encoding="utf-8"))
+            cleared["physician_queue_entries"] = len(existing.get("entries", []))
+        except Exception:
+            cleared["physician_queue_entries"] = -1
+        state_path.write_text('{"entries": [], "actions": []}\n', encoding="utf-8")
+
+    # Force the cached singleton to re-read the fresh state on next access
+    try:
+        from physician_queue import queue as queue_mod
+        queue_mod._DEFAULT_QUEUE = None
+    except Exception:
+        pass
+
+    # Clear test_*.jsonl files from decision_log
+    log_dir = _REPO_ROOT / "decision_log"
+    if log_dir.exists():
+        for f in log_dir.glob("test_*.jsonl"):
+            try:
+                f.unlink()
+                cleared["test_decision_logs"] += 1
+            except OSError:
+                pass
+
+    return {"reset": True, "cleared": cleared}
+
+
+# ---------------------------------------------------------------------------
 # Nurse queue + per-case endpoints (Loom-readiness, 2026-05-27)
 # ---------------------------------------------------------------------------
 
