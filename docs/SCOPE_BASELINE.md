@@ -152,7 +152,7 @@ The eval framework was bumped from v1 (8 scope §7 dims) to **v2 (12 active dims
 
 ## ADR Registry
 
-ADR-000 through ADR-014 are written. The Phase 2 plan reserves 015-016 for confidence calibration and max_turns budget. New ADRs from sessions outside the Phase 2 plan start at **017**.
+ADR-000 through ADR-018 are written. (Phase 2 plan originally reserved 015-016 for confidence calibration and max_turns budget; both were written 2026-05-27 and corrected in this registry on 2026-05-28.)
 
 | # | Title | Status |
 |---|---|---|
@@ -171,9 +171,10 @@ ADR-000 through ADR-014 are written. The Phase 2 plan reserves 015-016 for confi
 | 012 | Embedding model pinning | ✅ |
 | 013 | Corpus update policy | ✅ |
 | 014 | Denial Gate unlock + physician workflow | ✅ |
-| **015** | **Confidence threshold calibration** | **RESERVED (per Phase 2 plan)** |
-| **016** | **max_turns budget increase** | **RESERVED (per Phase 2 plan)** |
-| 017 | EVAL_TIER: dev/Sonnet vs ship/Opus | ✅ (this session — renumbered from 015) |
+| 015 | Confidence threshold calibration | ✅ |
+| 016 | max_turns budget increase | ✅ |
+| 017 | EVAL_TIER: dev/Sonnet vs ship/Opus | ✅ (renumbered from earlier draft 015) |
+| 018 | Bias / disparity monitoring | ✅ (scope-addition) |
 
 ---
 

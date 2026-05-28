@@ -238,7 +238,8 @@
     <form class="action-form" id="action-form" onsubmit="return false;">
       <div class="field">
         <label for="physician_id">Physician ID</label>
-        <input type="text" id="physician_id" placeholder="dr_smith" required>
+        <input type="text" id="physician_id" value="dr_smith" required>
+        <div class="helper-text">Pre-filled for the demo — overwrite with your real ID in production.</div>
       </div>
 
       <div class="field">
@@ -252,25 +253,25 @@
 
       <div class="field">
         <label for="clinical_basis">Clinical Basis</label>
-        <textarea id="clinical_basis" placeholder="State the clinical reasoning grounded in evidence." required></textarea>
-        <div class="helper-text">Required. 20+ characters recommended for compliance.</div>
+        <textarea id="clinical_basis" placeholder="e.g. Concur with nurse review; NCCN criteria met for surveillance imaging." required></textarea>
+        <div class="helper-text">Required for every action — including Approve. This is the governance audit substrate. 20+ characters recommended.</div>
       </div>
 
       <div class="field">
         <label for="guideline_citation">Guideline Citation</label>
-        <input type="text" id="guideline_citation" placeholder="NCCN-NSCLC-SURV-2" required>
-        <div class="helper-text">Structured citation (e.g., NCCN passage ID).</div>
+        <input type="text" id="guideline_citation" value="NCCN-NSCLC-SURV-2" required>
+        <div class="helper-text">Pre-filled with a representative citation — replace with the specific passage that applies. Required even for Approve.</div>
       </div>
 
       <div class="field deny-only" id="evidence-gaps-field">
         <label for="evidence_gaps">Evidence Gaps (one per line)</label>
-        <textarea id="evidence_gaps" placeholder="Missing initial pathology report&#10;90-day prior CT not confirmed"></textarea>
-        <div class="helper-text">Required for denial. Each line ≥ 10 chars.</div>
+        <textarea id="evidence_gaps" placeholder="e.g.&#10;Missing initial pathology report&#10;90-day prior CT not confirmed"></textarea>
+        <div class="helper-text">Required for denial only. Each line ≥ 10 chars.</div>
       </div>
 
       <div class="field">
         <label for="rationale">Additional Rationale (optional)</label>
-        <textarea id="rationale" placeholder="Optional narrative for the audit log."></textarea>
+        <textarea id="rationale" placeholder="e.g. Optional narrative for the audit log."></textarea>
       </div>
 
       <div class="button-row">
