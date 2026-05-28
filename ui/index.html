@@ -304,14 +304,16 @@
     </div>
   </div>
 
-  <!-- Eval Report -->
+  <!-- Eval Report — v3, bucket-grouped -->
   <div class="row">
     <div class="card">
-      <h2>Eval Report (v2 — RAI-aligned, 12 dims)</h2>
+      <h2>Eval Report (v3 — 16 dims, 3-bucket framing)</h2>
       <p class="desc">
-        Twelve dimensions across the six Responsible AI evaluation categories
-        (safety, grounding, policy compliance, HITL, explainability, fairness).
-        Cross-vendor judge (GPT-4o pinned snapshot) to avoid self-grading bias.
+        Sixteen dimensions across three stakeholder buckets:
+        <strong>Value</strong> — "Did it matter?" ·
+        <strong>Trust</strong> — "Can we rely on it safely?" (nests the 6 RAI categories) ·
+        <strong>Operational Reliability</strong> — "Can it reliably operate at scale?"
+        Cross-vendor judge (GPT-4o pinned snapshot) on faithfulness.
       </p>
       <div id="eval-summary">
         <p class="desc" style="font-style:italic;color:#9ca3af;">Loading latest eval report…</p>
@@ -427,35 +429,50 @@
       if (d.per_case_pass) summary.push(`<strong>${d.per_case_pass.passed}/${d.per_case_pass.total}</strong> passing per-case`);
       if (d.aggregate_pass) summary.push(`<strong>${d.aggregate_pass.passed}/${d.aggregate_pass.total}</strong> aggregate dims passing`);
 
-      // Build per-dim grid (just the most important ones)
-      const showDims = new Set([
-        "ai_decision_limit",
-        "source_citation_accuracy",
-        "adversarial_gate_bypass_rate",
-        "false_escalation_rate",
-        "citation_correctness",
-        "bias_disparity",
-      ]);
-      const headlineCards = d.aggregate_dims
-        .filter(dim => showDims.has(dim.dimension))
-        .map(dim => {
-          const cls = dim.status.includes("✓") ? "pass"
-                    : dim.status.includes("✗") ? "fail"
-                    : "na";
-          return `
-            <div class="eval-headline ${cls}">
-              <div class="dim-name">${esc(dim.dimension)}</div>
-              <div class="dim-value">${esc(dim.score)}</div>
+      // Bucket-grouped headline cards (eval framework v3)
+      const BUCKETS = [
+        { key: "value",       label: "Value / Outcomes",        sub: "Did it matter?" },
+        { key: "trust",       label: "Trust",                   sub: "Can we rely on it safely?" },
+        { key: "operational", label: "Operational Reliability", sub: "Can it run at scale?" },
+      ];
+
+      function statusClass(status) {
+        if (!status) return "na";
+        if (status.includes("✓")) return "pass";
+        if (status.includes("✗")) return "fail";
+        return "na";
+      }
+
+      const bucketBlocks = BUCKETS.map(bucket => {
+        const dims = d.aggregate_dims.filter(x => x.bucket === bucket.key);
+        if (dims.length === 0) return "";
+        const passing = dims.filter(x => statusClass(x.status) === "pass").length;
+        const failing = dims.filter(x => statusClass(x.status) === "fail").length;
+        const naCount = dims.filter(x => statusClass(x.status) === "na").length;
+        const dimCards = dims.map(dim => `
+          <div class="eval-headline ${statusClass(dim.status)}">
+            <div class="dim-name">${esc(dim.dimension)}</div>
+            <div class="dim-value">${esc(dim.score)}</div>
+          </div>
+        `).join("");
+        return `
+          <div style="margin-top:14px;">
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">
+              <strong style="font-size:0.95rem;">${esc(bucket.label)}</strong>
+              <span style="font-size:0.75rem;color:#6b7280;font-style:italic;">${esc(bucket.sub)}</span>
+              <span style="font-size:0.72rem;color:#374151;margin-left:auto;">${passing} pass · ${failing} fail · ${naCount} N/A</span>
             </div>
-          `;
-        }).join("");
+            <div class="eval-headlines">${dimCards}</div>
+          </div>
+        `;
+      }).join("");
 
       container.innerHTML = `
         <p class="desc" style="margin-bottom:8px;">
           Latest run: <strong>${esc(d.generated || "—")}</strong> · Mode: <strong>${esc(d.mode || "—")}</strong>
           <br>${summary.join(" · ")}
         </p>
-        <div class="eval-headlines">${headlineCards}</div>
+        ${bucketBlocks}
       `;
 
       // Wire the full-report link — opens via the static UI server

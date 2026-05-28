@@ -471,19 +471,44 @@ def print_report(
             print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} | {notes} |")
         print()
 
-    # Aggregate section
-    print("## Aggregate (Suite-Wide) Results")
+    # Aggregate section — grouped by bucket (eval framework v3)
+    # Buckets are the PM/audience-question grouping defined in eval/dimensions.py:
+    #   value       — "Did it matter?"
+    #   trust       — "Can we rely on it safely?"
+    #   operational — "Can it reliably operate at scale?"
+    from eval.dimensions import BUCKET_VALUE, BUCKET_TRUST, BUCKET_OPERATIONAL
+
+    _BUCKET_DISPLAY = [
+        (BUCKET_VALUE, "Value / Outcomes", "Did it matter? — ROI, TAT, cost, workflow compression"),
+        (BUCKET_TRUST, "Trust", "Can we rely on it safely? — bounded behavior, RAI alignment"),
+        (BUCKET_OPERATIONAL, "Operational Reliability", "Can it reliably operate at scale? — enforcement machinery, stability"),
+    ]
+
+    print("## Aggregate (Suite-Wide) Results — Grouped by Bucket")
     print()
-    print("| Dimension | Score | Target | Status | Notes |")
-    print("|---|---|---|---|---|")
-    for ds in aggregate_scores:
-        score_str = "N/A" if ds.score is None else f"{ds.score:.3f}"
-        status_str = "—" if ds.passed is None else ("✓" if ds.passed else "✗")
-        notes_short = (ds.notes or "").replace("|", "\\|").replace("\n", " ")
-        if len(notes_short) > 90:
-            notes_short = notes_short[:87] + "..."
-        print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} | {notes_short} |")
-    print()
+    for bucket_key, bucket_label, bucket_desc in _BUCKET_DISPLAY:
+        bucket_dims = [ds for ds in aggregate_scores if ds.bucket == bucket_key]
+        if not bucket_dims:
+            continue
+        bucket_passing = sum(1 for ds in bucket_dims if ds.passed is True)
+        bucket_total = sum(1 for ds in bucket_dims if ds.passed is not None)
+        bucket_summary = (
+            f"{bucket_passing}/{bucket_total} passing" if bucket_total > 0
+            else "no scored dims"
+        )
+        print(f"### {bucket_label} — *{bucket_desc}*")
+        print(f"_{bucket_summary}_")
+        print()
+        print("| Dimension | Score | Target | Status | Notes |")
+        print("|---|---|---|---|---|")
+        for ds in bucket_dims:
+            score_str = "N/A" if ds.score is None else f"{ds.score:.3f}"
+            status_str = "—" if ds.passed is None else ("✓" if ds.passed else "✗")
+            notes_short = (ds.notes or "").replace("|", "\\|").replace("\n", " ")
+            if len(notes_short) > 90:
+                notes_short = notes_short[:87] + "..."
+            print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} | {notes_short} |")
+        print()
 
     if not live:
         print("## Dimensions Not Scored In Unit Mode")

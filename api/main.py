@@ -187,13 +187,28 @@ def _parse_eval_report(md_path: pathlib.Path) -> dict[str, Any]:
     agg_match = _re.search(r"Aggregate dims passing:\s*(\d+)/(\d+)", text)
 
     # Aggregate dim table — pull score + status per dim
+    # The v3 report is grouped into ### bucket subsections under ## Aggregate.
+    # We track which bucket we're in so the dashboard can render bucket cards.
     aggregate_dims: list[dict[str, Any]] = []
     in_aggregate_section = False
+    current_bucket: str | None = None
+    _BUCKET_HEADER_MAP = {
+        "value / outcomes":         "value",
+        "trust":                    "trust",
+        "operational reliability":  "operational",
+    }
     for line in text.splitlines():
         if "## Aggregate" in line:
             in_aggregate_section = True
             continue
-        if in_aggregate_section and line.startswith("| ") and "|" in line[2:]:
+        if not in_aggregate_section:
+            continue
+        # Bucket subsection header: "### Value / Outcomes — ..."
+        if line.startswith("### "):
+            header_text = line[4:].split("—")[0].strip().lower()
+            current_bucket = _BUCKET_HEADER_MAP.get(header_text)
+            continue
+        if line.startswith("| ") and "|" in line[2:]:
             # Skip header / separator rows
             if "Dimension" in line or "---" in line:
                 continue
@@ -205,6 +220,7 @@ def _parse_eval_report(md_path: pathlib.Path) -> dict[str, Any]:
                     "target": parts[2],
                     "status": parts[3],
                     "notes": parts[4][:200],
+                    "bucket": current_bucket,
                 })
 
     return {
