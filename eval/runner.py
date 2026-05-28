@@ -48,7 +48,21 @@ if _EVAL_TIER not in {"dev", "ship"}:
 if _EVAL_TIER == "dev":
     # Dev tier: hardcode Sonnet for fast iteration.
     os.environ["MODEL_SNAPSHOT_OVERRIDE"] = "claude-sonnet-4-5-20250929"
-# ship tier: leave MODEL_SNAPSHOT_OVERRIDE untouched so agents fall back to model.yaml.
+elif _EVAL_TIER == "ship":
+    # Ship tier guard (standing policy 2026-05-28): ship-tier runs use the
+    # production Opus model, take 90-120 min wall, and produce audit-grade
+    # artifacts. Require an explicit acknowledgement env var so a ship-tier
+    # run can't be kicked off by accident (e.g., a forgotten EVAL_TIER=ship
+    # left over in a shell, or a script defaulting to ship without intent).
+    if os.environ.get("SHIP_TIER_APPROVED") != "yes":
+        raise ValueError(
+            "EVAL_TIER=ship requires explicit SHIP_TIER_APPROVED=yes.\n"
+            "Standing policy (2026-05-28): ship-tier eval runs cost ~90-120 min wall\n"
+            "and produce audit-grade artifacts. Default to EVAL_TIER=dev for iteration.\n"
+            "When a ship-tier run IS intended, set both:\n"
+            "    EVAL_TIER=ship SHIP_TIER_APPROVED=yes python eval/save_report.py"
+        )
+    # leave MODEL_SNAPSHOT_OVERRIDE untouched so agents fall back to model.yaml
 
 import json
 import pathlib

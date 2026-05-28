@@ -31,21 +31,35 @@ So we need both: fast eval iteration AND audit-grade eval-on-production-model.
 # Default — dev tier (fast iteration)
 python eval/save_report.py
 # → MODEL_SNAPSHOT_OVERRIDE = "claude-sonnet-4-5-20250929"
-# → agents load Sonnet, eval finishes in ~15-25 min
+# → agents load Sonnet, eval finishes in ~50-80 min (15 cases)
 
-# Ship gate / audit run
-EVAL_TIER=ship python eval/save_report.py
+# Ship gate / audit run (requires explicit approval — see below)
+EVAL_TIER=ship SHIP_TIER_APPROVED=yes python eval/save_report.py
 # → MODEL_SNAPSHOT_OVERRIDE unset
 # → agents fall back to config/model.yaml → Opus 4.1
-# → eval finishes in ~45-50 min, results are production-fidelity
+# → eval finishes in ~90-120 min (15 cases), results are production-fidelity
 ```
 
 The mechanism:
 
 - `eval/runner.py` reads `EVAL_TIER` at module-load time.
 - If `dev` (or unset): sets `MODEL_SNAPSHOT_OVERRIDE=claude-sonnet-4-5-20250929` BEFORE any agent import.
-- If `ship`: leaves the override unset.
-- Any other value raises `ValueError` at import — fail loud on typos.
+- If `ship`: requires `SHIP_TIER_APPROVED=yes` (standing policy 2026-05-28). With approval, leaves the override unset so model.yaml wins.
+- Any other tier value raises `ValueError` at import — fail loud on typos.
+
+**Standing policy (added 2026-05-28): ship-tier requires explicit approval.**
+
+Ship-tier runs cost ~90-120 min wall time on Opus and produce audit-grade artifacts. To prevent accidental ship-tier runs (e.g., a forgotten `EVAL_TIER=ship` left in a shell session, a CI script defaulting to ship without intent, or a developer mistyping), the runner requires `SHIP_TIER_APPROVED=yes` as a second env var.
+
+Without the approval var, ship-tier raises a clear error at import time:
+
+```
+ValueError: EVAL_TIER=ship requires explicit SHIP_TIER_APPROVED=yes.
+Standing policy (2026-05-28): ship-tier eval runs cost ~90-120 min wall
+and produce audit-grade artifacts. Default to EVAL_TIER=dev for iteration.
+```
+
+This is the same fail-loud pattern used elsewhere in the build (`ValueError` on misconfigured Determinism Contract invariants, etc.) — not a soft warning, a hard refusal to run.
 
 Each agent's `_load_model_snapshot()` checks the env var override first, then falls back to `config/model.yaml`. This same hook lets ops swap models per-run for ad-hoc experiments without editing files.
 

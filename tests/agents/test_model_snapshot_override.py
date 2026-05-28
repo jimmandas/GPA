@@ -66,11 +66,26 @@ def test_eval_runner_dev_tier_explicit(monkeypatch):
 
 
 def test_eval_runner_ship_tier_does_not_override(monkeypatch):
-    """EVAL_TIER=ship leaves MODEL_SNAPSHOT_OVERRIDE unset so model.yaml wins."""
+    """EVAL_TIER=ship leaves MODEL_SNAPSHOT_OVERRIDE unset so model.yaml wins.
+    Requires explicit SHIP_TIER_APPROVED=yes (standing policy 2026-05-28)."""
     monkeypatch.setenv("EVAL_TIER", "ship")
+    monkeypatch.setenv("SHIP_TIER_APPROVED", "yes")
     monkeypatch.delenv("MODEL_SNAPSHOT_OVERRIDE", raising=False)
     _reimport_runner()
     assert "MODEL_SNAPSHOT_OVERRIDE" not in os.environ
+
+
+def test_eval_runner_ship_tier_without_approval_raises(monkeypatch):
+    """EVAL_TIER=ship without SHIP_TIER_APPROVED=yes must fail loud at import.
+    Standing policy 2026-05-28: ship-tier runs require explicit user approval."""
+    monkeypatch.setenv("EVAL_TIER", "ship")
+    monkeypatch.delenv("SHIP_TIER_APPROVED", raising=False)
+    monkeypatch.delenv("MODEL_SNAPSHOT_OVERRIDE", raising=False)
+    import sys
+    if "eval.runner" in sys.modules:
+        del sys.modules["eval.runner"]
+    with pytest.raises(ValueError, match="SHIP_TIER_APPROVED"):
+        import eval.runner  # noqa: F401
 
 
 def test_eval_runner_rejects_invalid_tier(monkeypatch):
@@ -85,8 +100,9 @@ def test_eval_runner_rejects_invalid_tier(monkeypatch):
 
 
 def test_ship_tier_routes_to_production_opus(monkeypatch):
-    """End-to-end: ship tier → agents read model.yaml → Opus snapshot."""
+    """End-to-end: ship tier (with approval) → agents read model.yaml → Opus snapshot."""
     monkeypatch.setenv("EVAL_TIER", "ship")
+    monkeypatch.setenv("SHIP_TIER_APPROVED", "yes")
     monkeypatch.delenv("MODEL_SNAPSHOT_OVERRIDE", raising=False)
     _reimport_runner()
     # With the override unset, any agent's loader should fall back to yaml.
