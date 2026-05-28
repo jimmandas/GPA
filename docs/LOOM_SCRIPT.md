@@ -1,8 +1,10 @@
 # Loom Recording Script — GPA v4 (Phase 2 MVP)
 
-**Target length:** 3-5 minutes. **Format:** screen-share with narration. **Audience:** product / hiring-manager review for "AI governance in regulated healthcare workflows."
+**Target length:** 4-6 minutes. **Format:** screen-share with narration. **Audience:** product / hiring-manager review for "AI governance in regulated healthcare workflows."
 
-The narrative arc: **strategy → architecture → flow → eval → honest limits.** Each section maps to a specific tab/UI/file the viewer sees on screen.
+The narrative arc: **strategy → architecture → pipeline trace → nurse + physician flow → eval → honest limits.** Each section maps to a specific tab/UI/file the viewer sees on screen.
+
+**Key visual asset:** the **Pipeline Trace UI** (`ui/pipeline_trace.html`) — shows every agent and gate's input/output for a real case run, in 10 sequential cards. This is the strongest single demonstration that the architecture is real, not aspirational.
 
 ---
 
@@ -57,31 +59,50 @@ done
 
 ---
 
-## Section 3 (1:00 – 2:00) — The nurse workflow (live)
+## Section 3 (1:00 – 2:00) — The pipeline trace (live system journey)
 
-**Show:** Open `http://localhost:8001/queue.html` in the browser. The queue loads from the **live API** — viewer sees real cases.
+**Show:** Open `http://localhost:8001/queue.html`. Queue loads from the **live API** — 15 real cases.
 
-**Click `case_0001`** → opens `nurse_workspace.html?case_id=case_0001`. Yellow "DEMO BRIEF" banner shows — explain it.
+**Click the "View →" link** in the Trace column for `case_0001`. This opens `pipeline_trace.html?case_id=case_0001` and **auto-runs the pipeline**. ~20-30 sec running indicator.
+
+**Say (during the run):**
+
+> "Watch this. The queue picks a case, the Trace UI fires the full pipeline. In about 30 seconds you'll see 10 sequential cards — every agent's input and output, every gate's pass/fail, end-to-end. This isn't a diagram. This is the system actually executing."
+
+**When cards render, scroll through them:**
+
+- **Card 1:** Admission Gate (pure function, field-completeness check) — pass
+- **Cards 2-4:** Evidence Summarizer → Context Retriever → Policy Mapper agents — see the actual input/output JSON for each
+- **Card 5:** Confidence Gate — the 5th hard control (ADR-015) — pass/fail with threshold
+- **Card 6:** Reasoning Drafter agent — the AI brief gets produced here
+- **Card 7:** Source Verification Gate — every claim cites a verifiable evidence field — pass
+- **Card 8:** AI-Decision-Limit Gate — assert no `decision`/`recommendation`/`confidence` field in any agent output — pass
+- **Card 9:** Bilateral Logger pre-state (write-before-emit, fsync to disk)
+- **Card 10:** Determination → Nurse Queue (brief now visible to the nurse)
 
 **Say:**
 
-> "The nurse opens her queue — these cases are pulled live from the bilateral log via the API. She clicks case_0001 to review. You see the AI brief — supporting evidence, uncertainty flags, nurse focal points. The yellow banner makes it explicit: this is curated demo content. I'll click 'Run Live Pipeline' to show real output."
-
-**Click "Run Live Pipeline" button.** Banner flips to green "LIVE" after 20-60 seconds. Real brief renders.
-
-**Say:**
-
-> "That just ran 4 Claude calls in sequence — evidence summarizer, context retriever, policy mapper, reasoning drafter — through the 5 gates. The brief you're reading is what Opus produced for this case, end-to-end, in about 30 seconds. The schema enforces no decision field anywhere in this output."
-
-**Type a rationale, click Approve.**
-
-**Say:**
-
-> "The nurse's action goes to the bilateral logger with write-before-emit — fsync confirms durable write before the API returns. Let me show that."
+> "Five hard control gates, four agents, all instrumented. The viewer can see the determinism architecture working: temperature zero, pinned model snapshot, prompt hashes. No decision field appears anywhere in the agent outputs — that's an architectural guarantee, not a policy. The schema literally has no place to put one."
 
 ---
 
-## Section 4 (2:00 – 2:45) — Audit log + physician handoff
+## Section 4 (2:00 – 3:00) — The nurse workflow
+
+**Click the "Nurse Workspace →" button** in the trace UI header → opens `nurse_workspace.html?case_id=case_0001`.
+
+**Say:**
+
+> "The nurse opens the case. Yellow banner makes it explicit: this is a curated demo brief. The 'Run Live Pipeline' button would re-run the architecture for you — same as the trace UI just did."
+
+**Type a rationale**, click **Approve**.
+
+**Say:**
+
+> "The nurse's action goes to the bilateral logger via the API. Write-before-emit: fsync confirms durable write before the API returns. Let me show that."
+
+---
+
+## Section 5 (3:00 – 3:45) — Audit log + physician handoff
 
 **Open `http://localhost:8001/index.html`** (the audit viewer).
 
@@ -107,23 +128,33 @@ done
 
 ---
 
-## Section 5 (2:45 – 3:30) — Eval framework
+## Section 6 (3:45 – 4:45) — Eval framework v2 (RAI-aligned)
 
-**Show:** `eval/results/eval_report_<latest>.md` (the actual eval report from `EVAL_TIER=dev` or `ship`).
-
-**Say:**
-
-> "The eval scores 11 dimensions across 15 cases. The four per-case dims — source citation accuracy, AI decision limit, rationale faithfulness, decision reproducibility — score every case. The seven aggregate dims include adversarial gate bypass rate (zero tolerance), false escalation rate, confidence calibration, and bias disparity across case cohorts. The faithfulness judge is GPT-4o — different vendor — pinned to a specific snapshot so the verdict is part of the audit record."
-
-**Highlight 1-2 specific numbers from the report.**
+**Show:** `eval/results/eval_report_<latest>.md` (the actual eval report — dev-tier by default).
 
 **Say:**
 
-> "EVAL_TIER lets the team iterate cheaply on Sonnet during development, then run audit-grade on Opus before release. The dev signal and the ship signal are explicitly different artifacts; both are documented in ADR-017."
+> "Eval framework version 2. Twelve active dimensions across 15 cases, mapped to the six Responsible AI evaluation categories: safety, grounding, policy compliance, HITL, explainability, fairness. Every category has a named dim — none asserted as a vibe."
+
+**Walk through specific numbers from the latest dev-tier report:**
+
+- `ai_decision_limit = 1.00` across all 15 — *"AI never tried to emit a decision."*
+- `source_citation_accuracy = 1.00` — *"Every claim cites verifiable evidence."*
+- `adversarial_gate_bypass_rate = 0.000` — *"Every adversarial case blocked at a governance gate."*
+- `citation_correctness = 1.00` — *"Cited the right NCCN passages, not just valid ones — closes Failure Mode #9."*
+- Point at any FAILED dim (e.g., reproducibility on a specific case) — *"The eval is not a strawman; it surfaces real failures."*
+
+**Say:**
+
+> "EVAL_TIER lets us iterate cheap on Sonnet during dev, then run audit-grade on Opus for release evidence. The dev signal and the ship signal are explicitly different artifacts — documented in ADR-017. Standing policy: ship-tier requires explicit approval; the runner refuses without it. We don't burn Opus budget by accident."
+
+**Show the new per-case Notes column briefly:**
+
+> "The Notes column was added after a 97-minute eval run silently scored everything N/A on the faithfulness judge. Without the notes, the bug was invisible. With them, the diagnostic — `OPENAI_API_KEY not propagating to subprocess` — was instant. The eval is now self-instrumenting."
 
 ---
 
-## Section 6 (3:30 – 4:15) — Honest limits
+## Section 7 (4:45 – 5:30) — Honest limits
 
 **Show:** `docs/SCOPE_DELTAS.md` (the running log of removals/additions).
 
@@ -139,7 +170,7 @@ done
 
 ---
 
-## Section 7 (4:15 – 5:00) — Wrap
+## Section 8 (5:30 – 6:00) — Wrap
 
 **Show:** `docs/adr/` directory listing.
 
@@ -151,8 +182,30 @@ done
 
 ## Recording notes
 
-- **Pre-run the "Run Live Pipeline" button once before recording** to warm the SDK subprocess cache; subsequent runs are faster
-- **Record the live-pipeline section in real-time, don't cut it** — the 30-sec wait is the *point*; it makes the "AI is doing real work" claim concrete
-- **If the physician_queue ends up showing more than one pending case** (because case_0002 was previously escalated in tests), call out the duplicate-pending behavior briefly
-- **Keep narration declarative**: state what the system does. The viewer can see whether it actually does it.
-- **The eval report numbers will move between recording sessions** — that's fine; what matters is the framework being concrete
+### Before pressing record
+
+- **No eval running in background.** A live `eval/save_report.py` competes with the demo's pipeline calls for SDK subprocesses → live pipeline runs take 60+ sec instead of 30. Verify with `ps aux | grep save_report.py` — should be empty.
+- **Pre-warm the SDK subprocess cache.** Click "Run Live Pipeline" once on case_0001 in `pipeline_trace.html` BEFORE recording. Subsequent runs in the same session are faster (warm imports).
+- **Hard-refresh all browser tabs** (Cmd-Shift-R) so the UI JS isn't cached from a prior dev session.
+- **Have the eval report file open in a tab** — `eval/results/eval_report_<latest>.md`. Pre-scroll to the headline numbers you'll point at.
+- **Verify the physician queue state.** Check `http://localhost:8001/physician_queue.html`:
+  - If 0 pending — escalate case_0002 manually before recording so the queue has work.
+  - If 2+ pending stale (e.g., `case_test` from old test runs) — either narrate them as "the queue retains pending work between sessions" or clean them via the API before recording.
+
+### During recording
+
+- **Record the live-pipeline section in real-time, don't cut it.** The 30-sec wait is the *point*; it makes the "AI is doing real work" claim concrete. Narrate during the wait — describe what's happening behind the scenes.
+- **Keep narration declarative.** State what the system does. The viewer can see whether it actually does it.
+- **Don't apologize for limits.** Section 7 (Honest Limits) is the *strength* of the project, not a weakness. Lead with confidence that the cuts were the right PM calls.
+
+### Known rough edges (call out, don't hide)
+
+- **The "DEMO BRIEF" yellow banner** on nurse_workspace.html is a real feature — explicitly says "this is curated demo content; click Run Live Pipeline for real output." Narrate this honestly; it's part of the honest-framing story.
+- **`physician_queue` may show old test cases** (`case_test` from earlier test runs). Narrate as: "These persist between sessions because the queue is file-backed — same write-before-emit story as the bilateral log."
+- **Reproducibility = 0.80 on Sonnet dev tier is the PASS threshold**, not failure. If a viewer asks "why not 1.0?" — answer: *"5-run reproducibility is engineered determinism, not assumed. 4 of 5 byte-identical runs IS the pass bar; the 5th miss is captured in the bilateral log and surfaces as Sonnet variance on judgment-intensive cases. Opus reproduces more tightly."*
+
+### After recording
+
+- Watch playback once before publishing
+- Pay attention to whether the "Run Live Pipeline" wait felt natural or dead-air. If dead-air, add narration in a re-take
+- The eval report numbers will move between recording sessions — that's fine; what matters is the framework being concrete
