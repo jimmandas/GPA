@@ -211,3 +211,44 @@
   2. **Cohen's κ track** (Jim + Pax dual labeling) — ~10 person-hours; explicitly killed 2026-05-28 because it's a meta-eval
   3. **Dataset expansion to 25-30 cases** — strengthens every dim; cut from Phase 2
   4. **De-identified real PA decisions ingestion** — Phase 3 / data-share agreement
+- **See also #25** — consolidated human-eval-data program of which this is one slice.
+
+### 25. Human-eval-data program — the six-layer spectrum
+
+- **Date logged:** 2026-05-28
+- **Why this exists as its own item:** Phase 2 has FRAGMENTS of human eval data scattered across #4 (multi-rater), #5 (override capture), #20 (clinician-graded accuracy), #24 (SME sign-off on existing labels). A hiring manager who knows AI evals will ask "what's your human eval program?" and the answer should be one item, not four. This consolidates the strategic framing — and explicitly names the four gaps in the current backlog.
+- **Strategic framing:**
+  - For a regulated healthcare AI system, **human eval data is the most defensible eval signal you can have AND the most expensive to acquire.**
+  - Phase 2 deliberately shipped without it (cohens_kappa removed 2026-05-28; clinical accuracy out of scope per PRD §1; no SME sign-off). That was the right cost-discipline call for a POC.
+  - "Evals as enterprise-value instrumentation" (#23 positioning) is incomplete without naming what HUMAN signal feeds it.
+
+#### The six layers, priority-ordered (highest signal-per-dollar first)
+
+| # | Layer | What it produces | Cost (est.) | Status today | Intersects |
+|---|---|---|---|---|---|
+| 1 | **SME clinical sign-off on existing labels** | Validated ground truth from oncologist + radiologist on the 15 cases. Catches "labeler's NCCN read is wrong" failures. | ~2-4 hours expert × 2 SMEs = ~$1k-3k via paid clinical review service | named in #24 | #24 |
+| 2 | **Multi-rater ground-truth labeling** (Cohen's κ track) | Inter-rater agreement on labels — meta-eval that the eval's foundation is consistent. | ~10 person-hours per 15 cases × ~$50/hr nurse rate = ~$500 | killed 2026-05-28 (meta-eval, low OKR leverage) — re-add if dataset >100 cases | #4 |
+| 3 | **Human panel quality scoring of AI briefs** | Nurses + clinicians grading AI *outputs* on clarity, completeness, defensibility, citation discipline. Different from labeling — this scores the AI's product, not the ground truth. **This is what most LLM eval programs are.** | ~10-20 hours per N cases × multiple raters; ~$2k-10k depending on N | **NOT IN BACKLOG** — gap | new |
+| 4 | **Production deployment workflow telemetry** | What real nurses + physicians DID with AI briefs — approval rates, override rationales, time-on-case deltas vs. baseline, agreement patterns. Operational signal that feeds eval. | $0 incremental once pilot deployed; analysis is ~weeks of PM/data work | #5 captures the raw event substrate; analysis program not named | #5 |
+| 5 | **Adversarial human red-team testing** | Skilled adversaries actively trying to bypass governance gates / extract unauthorized decisions / break determinism. Different from the 5 adversarial cases in the dataset — those are the labeler's *hypotheses* about attacks. | ~20-40 hours per round × ~$150-300/hr security researcher = ~$3k-12k per round | **NOT IN BACKLOG** — gap | new |
+| 6 | **Preference / pairwise comparison data** | "Which of these two AI briefs is better?" — RLHF-style data. Hardest to get signal from at small N; valuable once you have a clinician pool. | $$$$$ — needs large N for statistical power | **NOT IN BACKLOG** — gap | new |
+
+#### What's missing from current backlog (the four gaps named above)
+
+- Layer 3 (human panel quality scoring of AI briefs) — biggest gap
+- Layer 4 (analysis program for production telemetry) — #5 has the substrate, not the analysis
+- Layer 5 (adversarial human red-team) — relevant for any pre-regulatory-submission posture
+- Layer 6 (preference data) — relevant once a clinician pool exists
+
+#### Triggers to prioritize
+
+- **Layer 1** — anytime, low cost, highest credibility-per-dollar improvement
+- **Layer 2-3** — before sharing eval results externally (external review, hiring portfolio, conference submission)
+- **Layer 4** — pilot deployment commitment
+- **Layer 5** — pre-regulatory submission (HIPAA, state insurance commissioner, FDA-equivalent), OR any compliance posture stronger than POC
+- **Layer 6** — multi-prompt-variant iteration becomes the bottleneck (post-pilot prompt tuning)
+
+#### Why this is one item, not six separate ones
+
+- Decisions about human eval data should be made *together* — the layers compete for the same expert-time budget, and ordering matters. Atomizing them obscures the trade-offs.
+- The hiring-manager-facing artifact (Loom or EVAL_WRITEUP) should be able to point at ONE place that names the whole program — "we know what human eval data we'd want, here it is in priority order, here's what we deliberately deferred." That's a stronger PM position than "we have 4 items scattered."
