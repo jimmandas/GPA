@@ -2,6 +2,8 @@
 
 **Owner:** Jim
 **Last updated:** 2026-05-27
+**Eval framework version:** **v2** (RAI-aligned expansion; 12 active dims; see `SCOPE_DELTAS.md`)
+**Phase 2 build version:** in-development (Week 11-12)
 **Source-of-truth docs:** see "Canonical Docs" below
 
 This file is the audit-grade reference for what's in scope, what's pending, and what's deviated. It captures the project's invariants, references the canonical PM docs, and tracks Phase 2 deliverables against the plan.
@@ -103,15 +105,48 @@ Per `phase-2-agentic-rag-plan.md`:
 | 12 | Threshold recommendations | ⏳ pending — depends on ConfidenceCalibrator |
 | 12 | Full eval run + ADRs merged | ⏳ partial — eval framework live; ADRs 015-016 + ship-tier run pending |
 
-### Phase 2 new eval dimensions
+### Phase 2 eval dimensions (v2 — RAI-aligned expansion)
 
-| Dimension | Status |
+The eval framework was bumped from v1 (8 scope §7 dims) to **v2 (12 active dims)** on 2026-05-27 to explicitly cover all 6 RAI evaluation categories the strategy doc §6 names as core constraints. See `SCOPE_DELTAS.md` for the full v1→v2 changelog.
+
+**4 per-case dims (scope §7, unchanged from v1):**
+
+| Dimension | RAI category | Status |
+|---|---|---|
+| source_citation_accuracy | Grounding | ✅ |
+| ai_decision_limit | Safety | ✅ |
+| rationale_faithfulness | Grounding + Explainability | ✅ (judge pinned to `gpt-4o-2024-11-20`) |
+| decision_reproducibility | Trustworthy | ✅ |
+
+**4 aggregate dims (scope §7, unchanged from v1):**
+
+| Dimension | RAI category | Status |
+|---|---|---|
+| adversarial_gate_bypass_rate | Safety | ✅ |
+| false_escalation_rate | HITL + Operational | ✅ |
+| confidence_calibration | Trustworthy | ✅ |
+| cohens_kappa | Trustworthy | ⚠ N/A (no co-labels yet) |
+
+**Phase 2 §12 additions (wired into runner 2026-05-27):**
+
+| Dimension | RAI category | Status |
+|---|---|---|
+| physician_queue_routing_accuracy | HITL + Policy compliance | ✅ wired (returns N/A until route mode + labeled cases) |
+| physician_rationale_compliance | Policy compliance | ✅ wired (returns N/A until physician actions exist) |
+
+**Scope-additions (this build):**
+
+| Dimension | RAI category | Status |
+|---|---|---|
+| bias_disparity (ADR-018) | Fairness | ✅ wired (cohort cuts: label_category, indication_category) |
+| citation_correctness | Grounding (closes scope §8 Failure Mode #9) | ✅ wired |
+
+**Removed dims (logged in `SCOPE_DELTAS.md`):**
+
+| Dimension | Reason |
 |---|---|
-| RAG Passage Relevance | ❌ **REMOVED 2026-05-27** (RAG deferred to Phase 3; dim has no substrate) |
-| Evidence Lineage Completeness | ❌ **REMOVED 2026-05-27** (no substrate after provider track cuts) |
-| Physician Queue Routing Accuracy | ✅ done |
-| Physician Rationale Compliance | ✅ done |
-| Bias Disparity (scope-addition) | ✅ done |
+| RAG Passage Relevance | RAG initiative deferred to Phase 3 (2026-05-27) |
+| Evidence Lineage Completeness | Provider experience track cut (2026-05-27) |
 
 ---
 

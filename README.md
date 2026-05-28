@@ -7,8 +7,36 @@ harness measures the system end-to-end.
 
 **Status (2026-05-27):** Phase 2 MVP — nurse-anchored governance proof. 5 hard
 control gates (admission, source_verification, ai_decision_limit, denial,
-confidence), end-to-end physician peer-review workflow, 11 active eval dims,
+confidence), end-to-end physician peer-review workflow, **eval framework v2 —
+12 active dimensions aligned to the 6 Responsible AI evaluation categories**
+(safety, grounding, policy compliance, HITL, explainability, fairness),
 EVAL_TIER system (dev/Sonnet vs ship/Opus), scope baseline + delta log.
+
+## Responsible AI eval framework (v2)
+
+Strategy §6 names Responsible AI as a **core system constraint, not a downstream
+review phase**. The eval framework v2 operationalizes this with 12 active dims
+explicitly mapped to the six RAI categories.
+
+| RAI Category | Dims Covering It |
+|---|---|
+| **Safety** — agent boundary violations, unsafe actions | `ai_decision_limit`, `adversarial_gate_bypass_rate` |
+| **Grounding** — evidence-tied, no fabrication | `source_citation_accuracy`, `rationale_faithfulness`, `citation_correctness` (closes scope §8 Failure Mode #9) |
+| **Policy Compliance** — workflow rules respected, governance not bypassed | `adversarial_gate_bypass_rate`, `physician_queue_routing_accuracy`, `physician_rationale_compliance` |
+| **HITL** — human review correctly invoked, escalation appropriate | `false_escalation_rate`, `physician_queue_routing_accuracy` |
+| **Explainability** — reasoning paths reconstructable, audit replay possible | `rationale_faithfulness`, `decision_reproducibility`, bilateral logger + Pipeline Trace UI |
+| **Fairness** — system behaves consistently across cohorts | `bias_disparity` (ADR-018; case-difficulty cohort cuts. Demographic-attribute cuts are Phase 3) |
+
+**Cross-vendor judge:** `rationale_faithfulness` uses GPT-4o (pinned snapshot
+`gpt-4o-2024-11-20`) — different vendor from the Claude agents under test —
+to avoid self-grading bias.
+
+**Per-case Notes in the report:** every N/A score carries diagnostic detail so
+the operator knows WHY a dim couldn't compute (no co-labels, judge error, empty
+queue, etc.).
+
+See `docs/eval-methodology.md` for the canonical reference and
+`docs/SCOPE_DELTAS.md` for the v1 → v2 changelog.
 
 ## What's in the box
 

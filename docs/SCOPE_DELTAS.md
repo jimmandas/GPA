@@ -16,6 +16,47 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
+### scope-addition: RAI-aligned eval framework expansion (eval v1 → v2) — 2026-05-27
+
+- **Date logged:** 2026-05-27
+- **Decision:** Major capability expansion. The eval framework went from scope §7's original 8 dimensions to **12 active dimensions** explicitly aligned to the 6 RAI evaluation categories (safety, grounding, policy compliance, HITL, explainability, fairness) the strategy doc §6 names as core constraints.
+- **What was named:** Scope §7 defines 8 dimensions. Phase 2 plan §12 named 4 additional dims. Strategy framing §6 names RAI as core constraint but the original PRD didn't operationalize specific RAI sub-categories in the eval.
+- **What's now included (12 active dims):**
+
+  **4 per-case dims (scope §7, unchanged):**
+  1. `source_citation_accuracy` — grounding category
+  2. `ai_decision_limit` — safety category
+  3. `rationale_faithfulness` — grounding + explainability categories (cross-vendor GPT-4o judge, pinned snapshot `gpt-4o-2024-11-20`)
+  4. `decision_reproducibility` — explainability + trustworthy category
+
+  **4 aggregate dims (scope §7, unchanged):**
+  5. `adversarial_gate_bypass_rate` — safety category
+  6. `false_escalation_rate` — HITL + operational category
+  7. `confidence_calibration` — trustworthy category (Brier proxy)
+  8. `cohens_kappa` — trustworthy category (currently N/A, no co-labels)
+
+  **2 Phase 2 §12 dims (now wired into the runner):**
+  9. `physician_queue_routing_accuracy` — HITL + policy compliance categories
+  10. `physician_rationale_compliance` — policy compliance category
+
+  **2 scope-addition dims:**
+  11. `bias_disparity` — fairness category (ADR-018; cohort cuts across `label_category` + `indication_category`)
+  12. `citation_correctness` — closes scope §8 Failure Mode #9 ("Faithful-but-Wrong"); precision of cited NCCN passages vs. ground-truth expected passages
+
+- **Why this is a "major capability":**
+  - Strategy doc §6 explicitly names "Responsible AI as a Core System Constraint" — RAI must be embedded in execution architecture, not bolted on
+  - The original PRD operationalized this through 8 dims; the expansion adds explicit coverage for HITL flow (physician routing), fairness (cohort disparity), and faithful-but-wrong citations
+  - Without the expansion, the build's regulator-facing claim ("we built RAI into the eval") rests on inference; with the expansion, the claim rests on named dims with thresholds
+  - Per-case report Notes column also added so N/A scores carry actionable diagnostic detail
+- **Version bump:** **Eval framework v1 → v2.** The Determinism Contract invariant 10 (`ClaudeAgentOptions` version-pinned + full eval re-run on changes) extends naturally — the eval framework itself is a version-pinned artifact.
+- **What this is NOT:**
+  - Not a clinical-accuracy expansion (PRD §1 honest limit still holds — POC proves governance plumbing, not clinical accuracy at scale)
+  - Not a demographic-fairness expansion (synthetic fixtures don't carry protected attributes; that's Phase 3, ADR-018)
+  - Not a regulation-specific compliance expansion (NCQA, CMS-0057-F still not measured)
+- **ADRs:** 015 (Confidence threshold calibration), 016 (max_turns budget), 017 (EVAL_TIER), 018 (Bias disparity monitoring). The dim `citation_correctness` is in the code; the ADR for it can fold into 018 or get its own (ADR-019) if you want explicit documentation.
+
+
+
 ### scope-clarification: RAG stack = Chroma now, pgvector at production scale
 
 - **Date logged:** 2026-05-27 (clarification logged post-hoc during baseline reconciliation)
