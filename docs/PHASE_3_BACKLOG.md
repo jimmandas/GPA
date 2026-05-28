@@ -74,6 +74,27 @@
 - **Why deferred:** User passed on judge calibration tracks in 2026-05-27 session. The path stays available.
 - **Trigger to prioritize:** Faithfulness scores need to be production-defensible to a regulator OR the daily judge starts looking like the bottleneck on detecting issues.
 
+### 17. Opus reasoning_drafter JSON parse stability
+
+- **Date logged:** 2026-05-28 (surfaced by the 2026-05-27 ship-tier eval)
+- **What:** On the ship-tier (Opus 4.1) eval run, the `reasoning_drafter` agent produced JSON outputs that failed `json.loads()` on 2-3 of 5 runs for 6 cases (case_0001, 0006, 0008, 0009, 0011, 0014). The pipeline correctly logged `schema_validation_event` records and cascaded to the next attempt, but this dropped `decision_reproducibility` to 0.60 on those cases (3/5 modal signal + 2/5 None).
+- **Root cause (from one captured event):**
+  - `failure_reason: "json_parse_error"`
+  - `failure_detail: "Expecting ',' delimiter: line 56 column 701 (char 3794)"`
+  - Opus's longer / more verbose output occasionally contains unescaped quotes, missing commas, or truncation-induced invalid JSON
+- **Why Sonnet doesn't show this rate:** Sonnet outputs are shorter and less likely to hit edge cases in JSON formatting. The eval framework's earlier dev-tier (Sonnet) runs had 0-1 schema validation failures vs. Opus's 2-3 per case.
+- **Recommended fix paths (any one, ordered by likely-effective):**
+  1. **Anthropic structured output / tool-use schema enforcement** — if available for Opus 4.1, this is the cleanest fix; lets the model emit guaranteed-valid JSON
+  2. **Prompt tightening** — explicit "output ONLY a JSON object, no markdown fences, no commentary, no trailing text" + add a section after the schema spec showing a valid example
+  3. **Post-processing JSON repair** — add a `_try_repair_json()` step that catches common Opus patterns (unescaped quotes inside strings, trailing commas in lists, markdown fence wrappers) and retries the parse once before failing
+  4. **Retry-with-feedback** — if first parse fails, send the model the error message and ask it to fix; one extra round-trip per case
+- **Not blocking Phase 2 ship** because:
+  - The pipeline correctly LOGS the failure (write-before-emit invariant holds)
+  - The reproducibility dim correctly catches the failure (not a silent bug)
+  - The cases that fail this still produce a valid brief on 3/5 runs (modal signal is recoverable)
+  - Sonnet (dev-tier) doesn't show this rate, so daily iteration is unaffected
+- **Trigger to prioritize:** Pre-production deployment OR shipping ship-tier eval numbers externally (e.g., to a regulator or external reviewer). Either context, reliability of the reasoning_drafter on Opus needs to be near-100%.
+
 ### 13. Bilateral logger physician_action event audit-log unification
 
 - **Date logged:** 2026-05-27 — **partially shipped this session**

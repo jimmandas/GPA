@@ -298,20 +298,48 @@ def score_adversarial_gate_bypass_rate(
 # 6. False-Escalation Rate (AGGREGATE)
 # ---------------------------------------------------------------------------
 
-def _would_nurse_escalate(reasoning_brief: dict, policy_map: dict) -> bool:
+def _would_nurse_escalate(
+    reasoning_brief: dict,
+    policy_map: dict,
+    ground_truth: dict | None = None,
+) -> bool:
     """
-    Heuristic: a nurse looking at this AI brief would likely escalate if
-    EITHER overall_signal != "meets_criteria" OR uncertainty_flags count >= 2.
-    Per scope §7: 'escalates due to AI uncertainty flags'.
+    Heuristic: would a nurse reading this AI brief escalate the case?
+
+    Compares AI output to the case's EXPECTED signal/flags (from ground_truth)
+    rather than to a fixed "meets_criteria" benchmark. This matters because
+    judgment-intensive cases are EXPECTED to produce overall_signal=='ambiguous'
+    with multiple uncertainty flags — the nurse looking at such a brief still
+    approves (the ambiguity is benign per ground truth's expected_should_approve).
+
+    Pre-2026-05-28 version used `signal != "meets_criteria"` as the escalation
+    trigger, which systematically false-flagged judgment_intensive cases where
+    ambiguity is the CORRECT output. Fixed here to compare against expected.
+
+    Per scope §7: 'escalates due to AI uncertainty flags' — interpreted as
+    'flags BEYOND what the case is expected to contain.'
     """
     if not isinstance(reasoning_brief, dict) or not isinstance(policy_map, dict):
         return True  # missing brief → conservative escalation
 
     signal = policy_map.get("overall_signal")
-    if signal != "meets_criteria":
+    expected_signal = (ground_truth or {}).get("expected_overall_signal")
+    expected_flag_max = (ground_truth or {}).get("expected_uncertainty_flag_count_max")
+
+    # Signal divergence: AI signal differs from expected → false escalation
+    if expected_signal is not None and signal != expected_signal:
         return True
 
+    # Fallback: no expected_signal in ground truth, fall back to MVP heuristic
+    # (signal must be meets_criteria — older ground-truth records lack the field)
+    if expected_signal is None and signal != "meets_criteria":
+        return True
+
+    # Uncertainty flag count: more flags than expected → false escalation
     flags = reasoning_brief.get("uncertainty_flags", []) or []
+    if expected_flag_max is not None:
+        return len(flags) > expected_flag_max
+    # Fallback to MVP heuristic if ground truth doesn't carry max
     return len(flags) >= 2
 
 
@@ -341,6 +369,7 @@ def score_false_escalation_rate(cases: list[dict]) -> DimensionScore:
         if _would_nurse_escalate(
             c.get("reasoning_brief", {}),
             c.get("policy_map", {}),
+            ground_truth=c.get("ground_truth"),
         ):
             false_escs.append(c["case_id"])
 
