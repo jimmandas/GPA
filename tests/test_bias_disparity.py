@@ -11,11 +11,17 @@ from eval.dimensions import score_bias_disparity
 
 
 def _case(case_id, label_cat, indication_cat, scores):
+    """Helper. Cohort field names match _BIAS_COHORT_FIELDS in dimensions.py:
+    'label' (clean / judgment_intensive / adversarial) and
+    'expected_overall_signal' (meets_criteria / does_not_meet / ambiguous).
+    Parameter names retained for readability but values map to the real
+    ground_truth.jsonl schema.
+    """
     return {
         "case_id": case_id,
         "ground_truth": {
-            "label_category": label_cat,
-            "indication_category": indication_cat,
+            "label": label_cat,
+            "expected_overall_signal": indication_cat,
         },
         "per_case_dim_scores": scores,
     }
@@ -51,7 +57,7 @@ class TestBiasDisparityDetection:
         assert result.score == 1.0
 
     def test_large_spread_fails(self):
-        """Score spread of 0.40 across label_category cohorts → fail."""
+        """Score spread of 0.40 across label cohorts → fail."""
         cases = [
             _case("c1", "clean", "staging", {"source_citation_accuracy": 1.0}),
             _case("c2", "clean", "staging", {"source_citation_accuracy": 1.0}),
@@ -60,7 +66,7 @@ class TestBiasDisparityDetection:
         ]
         result = score_bias_disparity(cases)
         assert result.passed is False
-        assert "label_category/source_citation_accuracy" in result.notes
+        assert "label/source_citation_accuracy" in result.notes
         assert "clean=1.00" in result.notes
         assert "adversarial=0.60" in result.notes
 
@@ -85,14 +91,14 @@ class TestBiasDisparityDetection:
 
 class TestBiasDisparityMultipleCuts:
     def test_disparity_in_any_cut_fails(self):
-        """Disparity only in indication_category → still fails."""
+        """Disparity only in expected_overall_signal → still fails."""
         cases = [
             _case("c1", "clean", "staging", {"source_citation_accuracy": 1.0}),
             _case("c2", "clean", "surveillance", {"source_citation_accuracy": 0.5}),
         ]
         result = score_bias_disparity(cases)
         assert result.passed is False
-        assert "indication_category" in result.notes
+        assert "expected_overall_signal" in result.notes
 
     def test_multiple_disparate_dims_all_reported(self):
         """If two dims show disparity, both should be named in notes."""
@@ -114,12 +120,12 @@ class TestBiasDisparityMultipleCuts:
 
 
 class TestBiasDisparityIgnoresMissingData:
-    def test_cases_without_label_category_skipped(self):
+    def test_cases_without_label_skipped(self):
         cases = [
             _case("c1", "clean", "staging", {"source_citation_accuracy": 1.0}),
             {"case_id": "c2", "ground_truth": {}, "per_case_dim_scores": {"source_citation_accuracy": 0.5}},
         ]
-        # Only c1 has label_category set; not enough cohorts → no disparity
+        # Only c1 has label set; not enough cohorts → no disparity
         result = score_bias_disparity(cases)
         # Either pass (one cohort) or NA — both acceptable
         assert result.passed in (True, None)

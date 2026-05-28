@@ -6,7 +6,21 @@ implementation called print_report(cases) — but run_eval returns a tuple
 successful 97-min eval run. This fix unpacks the tuple correctly and
 adds a defensive fallback so any future signature drift surfaces loudly
 WITHOUT losing the eval data.
+
+Env loading: explicitly loads .env at startup so the OPENAI_API_KEY needed
+by the cross-vendor faithfulness judge propagates into the python process
+regardless of how the caller's shell handles `source .env`. (`source` sets
+shell vars without exporting; child python processes don't see them unless
+the .env line uses `export X=Y` or the caller uses `set -a; source .env;
+set +a`. Loading dotenv here makes the entry point self-sufficient.)
 """
+# Load .env BEFORE importing anything that captures env state.
+# Without this, the GPT-4o faithfulness judge fails with 'missing_api_key'
+# and every per-case rationale_faithfulness score is N/A — exactly the
+# bug the 2026-05-28 ship-tier eval surfaced (12/15 cases lost).
+from dotenv import load_dotenv
+load_dotenv()
+
 import io
 import json
 import os

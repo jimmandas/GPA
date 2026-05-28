@@ -696,7 +696,19 @@ def score_physician_rationale_compliance(physician_queue=None) -> DimensionScore
 _BIAS_MAX_SPREAD = 0.20
 
 # Which case fields to cut cohorts by (read from ground_truth.jsonl).
-_BIAS_COHORT_FIELDS = ("label_category", "indication_category")
+#
+# Earlier this was ("label_category", "indication_category") but those keys
+# don't exist in ground_truth.jsonl — the actual schema has "label"
+# (clean / judgment_intensive / adversarial) and "expected_overall_signal"
+# (meets_criteria / does_not_meet / ambiguous). 2026-05-28 ship-tier eval
+# returned "no cuts had ≥2 cohorts" because of the mismatch; fixed here.
+#
+# Both cohort cuts give meaningful disparity signal:
+#   - label: case-difficulty cohorts (clean vs adversarial should differ in
+#     score; the dim catches IMPLAUSIBLY large gaps, not all gaps)
+#   - expected_overall_signal: clinical-judgment cohorts (does the system
+#     perform similarly on meets/does-not-meet/ambiguous cases?)
+_BIAS_COHORT_FIELDS = ("label", "expected_overall_signal")
 
 # Which already-computed per-case dim scores to test for disparity.
 # Restricted to dims that produce real per-case floats (not pass/fail flags).
