@@ -128,27 +128,39 @@ done
 
 ---
 
-## Section 6 (3:45 – 4:45) — Eval framework v2 (RAI-aligned)
+## Section 6 (3:45 – 4:45) — Eval framework v3 (3 buckets: Value / Trust / Operational)
 
 **Show:** `eval/results/eval_report_<latest>.md` (the actual eval report — dev-tier by default).
 
 **Say:**
 
-> "Eval framework version 2. Twelve active dimensions across 15 cases, mapped to the six Responsible AI evaluation categories: safety, grounding, policy compliance, HITL, explainability, fairness. Every category has a named dim — none asserted as a vibe."
+> "Eval framework version 3. Nineteen active dimensions across 15 cases, grouped into three buckets — Value / Outcomes, Trust, and Operational Reliability. The framing matters: most AI eval work stops at model accuracy and hallucinations. This is closer to enterprise value instrumentation — the eval measures workflow correctness, governance adherence, AND business impact in the same artifact."
 
-**Walk through specific numbers from the latest dev-tier report:**
+**Walk through the buckets in the report (each has its own subsection):**
 
+**Bucket 1 — Value / Outcomes (the ROI line):**
+- `estimated_roi_per_case_usd` — *"Heuristic: nurse manual review baseline minus pipeline cost. Caveat is on the line — real ROI needs production telemetry, but the eval surfaces a defensible estimate today."*
+- `false_escalation_rate` — *"How often the system sends cases to physicians that didn't need it. Workflow-compression value depends on this staying low."*
+- `pipeline_completion_rate` — *"Cases that survived all 5 gates end-to-end. Production-stability proxy."*
+
+**Bucket 2 — Trust (the RAI / governance core, 10 dims):**
 - `ai_decision_limit = 1.00` across all 15 — *"AI never tried to emit a decision."*
 - `source_citation_accuracy = 1.00` — *"Every claim cites verifiable evidence."*
-- `adversarial_gate_bypass_rate = 0.000` — *"Every adversarial case blocked at a governance gate."*
 - `citation_correctness = 1.00` — *"Cited the right NCCN passages, not just valid ones — closes Failure Mode #9."*
+- `adversarial_gate_bypass_rate = 0.000` — *"Every adversarial case blocked at a governance gate."*
+- `bias_disparity` — *"Cohort cuts by case difficulty and indication. Demographic-attribute cuts are Phase 3."*
 - Point at any FAILED dim (e.g., reproducibility on a specific case) — *"The eval is not a strawman; it surfaces real failures."*
+
+**Bucket 3 — Operational Reliability (latency / cost / gate sanity):**
+- `pipeline_wall_time_p50_seconds` + `pipeline_latency_p90_seconds` — *"TAT proxy. p50 says the median experience, p90 says the tail — both matter for production SLAs."*
+- `estimated_cost_per_case_usd` — *"Token-based heuristic. Tier 1 admin-cost proxy."*
+- `gate_fire_distribution` — *"Informational. Confirms gates are actually exercised across the dataset; if no adversarial case ever trips a gate, the gate isn't doing work."*
 
 **Say:**
 
-> "EVAL_TIER lets us iterate cheap on Sonnet during dev, then run audit-grade on Opus for release evidence. The dev signal and the ship signal are explicitly different artifacts — documented in ADR-017. Standing policy: ship-tier requires explicit approval; the runner refuses without it. We don't burn Opus budget by accident."
+> "The six RAI categories Strategy §6 names — safety, grounding, policy compliance, HITL, explainability, fairness — all sit inside the Trust bucket. The other two buckets exist because trust without value isn't a product, and value without operational reliability isn't deployable. EVAL_TIER lets us iterate cheap on Sonnet during dev, then run audit-grade on Opus for release evidence — documented in ADR-017. Standing policy: ship-tier requires explicit approval; the runner refuses without it. We don't burn Opus budget by accident."
 
-**Show the new per-case Notes column briefly:**
+**Show the per-case Notes column briefly:**
 
 > "The Notes column was added after a 97-minute eval run silently scored everything N/A on the faithfulness judge. Without the notes, the bug was invisible. With them, the diagnostic — `OPENAI_API_KEY not propagating to subprocess` — was instant. The eval is now self-instrumenting."
 
