@@ -48,7 +48,7 @@ See `docs/eval-methodology.md` for the canonical reference and
 | `physician_queue/` | **(Phase 2)** PhysicianQueue ABC + FilePhysicianQueue + ActionRecord for peer review workflow |
 | `rag/` | PolicyRetriever ABC + FixtureRetriever (active). Real RAG pipeline is Phase 3 — see `docs/PHASE_3_BACKLOG.md` item #10 |
 | `logs/bilateral_logger.py` | Write-before-emit audit log (now also receives `physician_action_record` events) |
-| `eval/` | Eval harness — **11 dimensions** + ConfidenceCalibrator + EVAL_TIER system (see `docs/eval-methodology.md`) |
+| `eval/` | Eval harness — **12 dimensions** + ConfidenceCalibrator + EVAL_TIER system (see `docs/eval-methodology.md`) |
 | `api/main.py` | FastAPI app — pipeline endpoints, nurse queue/case endpoints, audit endpoints, physician queue/action endpoints |
 | `ui/*.html` | Static review UI: `queue.html` (nurse queue), `nurse_workspace.html`, `physician_queue.html`, `physician_workspace.html`, `index.html` (audit viewer). All wired to live API |
 | `prompts/` | System prompts for each agent (hash-pinned in `config/prompt_hashes.yaml`) |
@@ -111,7 +111,7 @@ SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py
 
 The `PYTHONPATH=.` is required — without it the module imports fail.
 
-Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. The **11 active dimensions** (see `docs/eval-methodology.md` for full reference):
+Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. The **12 active dimensions** (see `docs/eval-methodology.md` for full reference):
 
 | # | Dimension | Layer | Target |
 |---|---|---|---|
@@ -126,6 +126,7 @@ Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. 
 | 9 | physician_queue_routing_accuracy | aggregate (Phase 2 §12) | >=0.80 |
 | 10 | physician_rationale_compliance | aggregate (Phase 2 §12) | >=0.95 |
 | 11 | bias_disparity | aggregate (ADR-018 scope-addition) | max spread <0.20 |
+| 12 | citation_correctness | aggregate (closes scope §8 Failure Mode #9) | >=0.95 |
 
 **Eval tiers** (ADR-017):
 

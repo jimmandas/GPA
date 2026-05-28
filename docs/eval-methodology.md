@@ -6,7 +6,7 @@ This document captures the eval design per `imaging-pa-poc-scope.md §7-§8` plu
 
 ---
 
-## The 11 active dimensions
+## The 12 active dimensions
 
 ### Per-case (4) — from scope §7
 
@@ -37,7 +37,8 @@ This document captures the eval design per `imaging-pa-poc-scope.md §7-§8` plu
 
 | # | Dimension | Computed from | Target |
 |---|---|---|---|
-| 11 | `bias_disparity` | Max spread of per-case scores (source_citation_accuracy / rationale_faithfulness / decision_reproducibility) across `label_category` and `indication_category` cohorts | max spread < 0.20 |
+| 11 | `bias_disparity` | Max spread of per-case scores (source_citation_accuracy / rationale_faithfulness / decision_reproducibility) across `label` and `expected_overall_signal` cohorts | max spread < 0.20 |
+| 12 | `citation_correctness` | Precision of cited NCCN passage IDs (`policy_map.criteria[].nccn_passage_id` + `policy_map.passage_ids_used`) vs. `ground_truth.expected_criterion_status` keys. Closes scope §8 Failure Mode #9 (Faithful-but-Wrong) | >=0.95 |
 
 ### Removed during Phase 2 reality-check
 
