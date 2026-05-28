@@ -6,7 +6,7 @@ This document captures the eval design per `imaging-pa-poc-scope.md §7-§8` plu
 
 ---
 
-## The 16 active dimensions (v3)
+## The 19 active dimensions (v3)
 
 **Eval framework v3** (2026-05-28) adds 4 Tier 1 business-value dims to v2's
 12 RAI-aligned correctness dims. See `CHANGELOG.md` for the v2→v3 changelog.

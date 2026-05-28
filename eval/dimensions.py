@@ -1216,6 +1216,202 @@ def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
     )
 
 
+def score_pipeline_latency_p90_seconds(cases: list[dict]) -> DimensionScore:
+    """
+    p90 of pipeline wall time. Variance signal — paired with p50 dim shows
+    how predictable the latency is. A p50 of 30s + p90 of 120s says the tail
+    is bad even if median is fine. Maps to Operational Reliability bucket.
+    Target: <90s p90 — informational.
+    """
+    target = "<90s"
+    dim = "pipeline_latency_p90_seconds"
+    timings: list[float] = []
+    for c in cases:
+        for t in c.get("pipeline_run_wall_seconds") or []:
+            if isinstance(t, (int, float)) and t > 0:
+                timings.append(float(t))
+    if not timings:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No wall-time data (live mode required).",
+            is_aggregate=True,
+            bucket=BUCKET_OPERATIONAL,
+        )
+    timings.sort()
+    n = len(timings)
+    p90 = timings[min(n - 1, int(n * 0.9))]
+    p99 = timings[min(n - 1, int(n * 0.99))]
+    p50 = timings[n // 2]
+    return DimensionScore(
+        dimension=dim,
+        score=p90,
+        target=target,
+        passed=p90 < 90.0,
+        notes=(
+            f"p90={p90:.1f}s, p99={p99:.1f}s (p50={p50:.1f}s for context). "
+            "Tail-latency signal — high p90 with low p50 means unpredictable."
+        ),
+        is_aggregate=True,
+        bucket=BUCKET_OPERATIONAL,
+    )
+
+
+# Nurse rate + TAT baseline for the heuristic ROI dim. These are assumptions,
+# not measurements — published nurse RN average ~$45/hr (BLS); manual PA
+# review time ~5 min per case (multiple UM published studies). Stored as
+# constants so a real pilot can override.
+_NURSE_HOURLY_USD_BASELINE = 45.0
+_MANUAL_REVIEW_SECONDS_BASELINE = 300.0
+
+
+def score_estimated_roi_per_case_usd(cases: list[dict]) -> DimensionScore:
+    """
+    Heuristic ROI per case (USD): time-saved value minus API+judge cost.
+
+    Formula:
+      time_saved_seconds   = max(0, MANUAL_BASELINE - pipeline_p50_seconds)
+      value_saved_per_case = (time_saved_seconds / 3600) * NURSE_HOURLY_USD
+      cost_per_case        = score_estimated_cost_per_case_usd(cases).score
+      roi                  = value_saved_per_case - cost_per_case
+
+    Assumptions (overridable in a real pilot):
+      - MANUAL_BASELINE = 300s = 5 min (UM-study average for manual PA review)
+      - NURSE_HOURLY_USD = $45 (BLS average for RN)
+      - Uses pipeline p50 latency as the per-case time spent
+
+    Maps to Value bucket. Target: >$0 — positive ROI per case.
+
+    Limits (honest):
+      - Both inputs are heuristics; real ROI needs production pilot data
+        (Phase 3 backlog #18 Tier 2 covers the real version)
+      - Does NOT include nurse review time AFTER the brief is produced
+        (the brief still needs nurse attention; this only measures the
+         compression value vs. fully-manual review)
+      - Does NOT include downstream costs (denied/appealed cases)
+    """
+    target = ">$0"
+    dim = "estimated_roi_per_case_usd"
+
+    if not cases:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No cases.",
+            is_aggregate=True,
+            bucket=BUCKET_VALUE,
+        )
+
+    # Reuse the cost-per-case calculation
+    cost_result = score_estimated_cost_per_case_usd(cases)
+    if cost_result.score is None:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes=f"Cost-per-case is N/A ({cost_result.notes!r}). ROI requires it.",
+            is_aggregate=True,
+            bucket=BUCKET_VALUE,
+        )
+    cost_per_case = cost_result.score
+
+    # Get pipeline p50
+    timings: list[float] = []
+    for c in cases:
+        for t in c.get("pipeline_run_wall_seconds") or []:
+            if isinstance(t, (int, float)) and t > 0:
+                timings.append(float(t))
+    if not timings:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No wall-time data (live mode required). ROI needs pipeline latency.",
+            is_aggregate=True,
+            bucket=BUCKET_VALUE,
+        )
+    timings.sort()
+    pipeline_seconds = timings[len(timings) // 2]
+
+    time_saved_seconds = max(0.0, _MANUAL_REVIEW_SECONDS_BASELINE - pipeline_seconds)
+    value_saved = (time_saved_seconds / 3600.0) * _NURSE_HOURLY_USD_BASELINE
+    roi = value_saved - cost_per_case
+
+    return DimensionScore(
+        dimension=dim,
+        score=roi,
+        target=target,
+        passed=roi > 0,
+        notes=(
+            f"~${roi:+.3f}/case "
+            f"(saved {time_saved_seconds:.0f}s vs {int(_MANUAL_REVIEW_SECONDS_BASELINE)}s baseline @ "
+            f"${_NURSE_HOURLY_USD_BASELINE}/hr nurse = ${value_saved:.3f}, minus ${cost_per_case:.3f} API/judge cost). "
+            "Heuristic — real pilot data is Phase 3."
+        ),
+        is_aggregate=True,
+        bucket=BUCKET_VALUE,
+    )
+
+
+def score_clinical_signal_accuracy(cases: list[dict]) -> DimensionScore:
+    """
+    % of cases where the AI's `overall_signal` matches the ground truth's
+    `expected_overall_signal`. The closest dim to "clinical accuracy"
+    we can compute without a real clinical-accuracy study.
+
+    Maps to Trust bucket. Target: >=0.80.
+
+    What this catches:
+      - case_0011 (Stage IA wedge resection — expected ambiguous; AI
+        produced does_not_meet → mismatch counted)
+      - Any case where AI's policy-mapper landed on a different bucket
+        than ground truth expected
+
+    What this does NOT catch:
+      - Whether the cited evidence was right (citation_correctness covers this)
+      - Whether the rationale was supported (rationale_faithfulness)
+      - Whether the AI was *clinically* correct in the medical sense
+        (deliberately out of scope per PRD §1)
+
+    PRD honest-limit framing: this measures signal-alignment with
+    ground truth, NOT clinical correctness at scale.
+    """
+    target = ">=0.80"
+    dim = "clinical_signal_accuracy"
+
+    matches = 0
+    total = 0
+    misses: list[str] = []
+    for c in cases:
+        gt = c.get("ground_truth", {})
+        expected = gt.get("expected_overall_signal")
+        if not isinstance(expected, str):
+            continue
+        actual = (c.get("policy_map") or {}).get("overall_signal")
+        if not isinstance(actual, str):
+            continue
+        total += 1
+        if actual == expected:
+            matches += 1
+        else:
+            misses.append(f"{c.get('case_id','?')}: AI={actual!r} vs expected={expected!r}")
+
+    if total == 0:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No labeled cases (need ground_truth.expected_overall_signal).",
+            is_aggregate=True,
+            bucket=BUCKET_TRUST,
+        )
+    rate = matches / total
+    notes = f"{matches}/{total} signals match ground truth."
+    if misses:
+        notes += f" Mismatches: {misses[:4]}" + (" …" if len(misses) > 4 else "")
+    return DimensionScore(
+        dimension=dim,
+        score=rate,
+        target=target,
+        passed=rate >= 0.80,
+        notes=notes,
+        is_aggregate=True,
+        bucket=BUCKET_TRUST,
+    )
+
+
 def score_gate_fire_distribution(cases: list[dict]) -> DimensionScore:
     """
     Informational dim (no pass/fail): how many distinct gates fired.

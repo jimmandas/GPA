@@ -308,14 +308,13 @@ def test_run_eval_unit_mode():
         assert isinstance(case.dimension_scores, list)
         # Per-case has exactly 4 dims (2 computable in unit mode + 2 deferred)
         assert len(case.dimension_scores) == 4
-    # 12 aggregate dimensions after eval framework v3 (2026-05-28):
+    # 15 aggregate dimensions after eval framework v3 + follow-ups (2026-05-28):
     #   - 4 scope §7 originals
-    #   - 4 Phase 2 / scope additions (physician_queue_routing_accuracy,
-    #     physician_rationale_compliance, bias_disparity, citation_correctness)
-    #   - 4 Tier 1 business-value (pipeline_wall_time_p50_seconds,
-    #     pipeline_completion_rate, estimated_cost_per_case_usd,
-    #     gate_fire_distribution)
-    assert len(aggregates) == 12
+    #   - 4 Phase 2 / scope additions
+    #   - 4 Tier 1 business-value
+    #   - 3 v3 follow-ups (pipeline_latency_p90_seconds, estimated_roi_per_case_usd,
+    #     clinical_signal_accuracy)
+    assert len(aggregates) == 15
 
 
 def test_run_eval_unit_mode_per_case_dim_names():
@@ -350,6 +349,10 @@ def test_run_eval_unit_mode_aggregate_dim_names():
         "pipeline_completion_rate",        # stability
         "estimated_cost_per_case_usd",     # admin cost proxy
         "gate_fire_distribution",          # gate exercise sanity check
+        # v3 follow-ups (2026-05-28)
+        "pipeline_latency_p90_seconds",    # tail-latency / variance
+        "estimated_roi_per_case_usd",      # ROI heuristic (Value)
+        "clinical_signal_accuracy",        # signal-alignment with ground truth (Trust)
     }
     actual = {ds.dimension for ds in aggregates}
     assert actual == expected

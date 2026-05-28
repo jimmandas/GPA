@@ -16,6 +16,43 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
+### scope-addition: eval framework v3 — 3-bucket framing + ROI + signal accuracy + latency p90 — 2026-05-28
+
+- **Date logged:** 2026-05-28
+- **Decision:** Major framing expansion: the eval went from "12 dims grouped by 6 RAI categories" (v2) to **"16+3=19 dims grouped by 3 stakeholder buckets, with RAI categories nested inside Trust"** (v3). The new framing is more PM-defensible because each bucket answers a different audience's question. Also added 7 new dims (4 Tier 1 business-value + 3 follow-ups including ROI heuristic).
+- **What's now included in v3 (19 active dims across 3 buckets):**
+
+  **Value bucket (4) — "Did it matter?"**
+  - `false_escalation_rate` (workflow compression — moved from HITL when buckets were introduced)
+  - `pipeline_wall_time_p50_seconds` (TAT proxy, OKR1 KR1)
+  - `estimated_cost_per_case_usd` (admin cost proxy, heuristic)
+  - `estimated_roi_per_case_usd` (ROI heuristic — value saved minus cost, NEW 2026-05-28)
+
+  **Trust bucket (10) — "Can we rely on it safely?" — nests the 6 RAI categories**
+  - `source_citation_accuracy`, `ai_decision_limit`, `rationale_faithfulness`, `adversarial_gate_bypass_rate`, `confidence_calibration`, `cohens_kappa`, `physician_queue_routing_accuracy`, `physician_rationale_compliance`, `bias_disparity`, `citation_correctness`
+  - `clinical_signal_accuracy` (signal-alignment with ground truth, NEW 2026-05-28; the closest dim to "clinical accuracy" within the PRD honest-limit constraint)
+
+  **Operational Reliability bucket (5) — "Can it reliably operate at scale?"**
+  - `decision_reproducibility` (per-case)
+  - `pipeline_completion_rate`, `gate_fire_distribution`
+  - `pipeline_latency_p90_seconds` (tail-latency variance, NEW 2026-05-28)
+
+- **Why this matters strategically:** The 3-bucket framing is "evals as enterprise-value instrumentation" — a level UP from traditional model/agent/observability evals. It measures organizational accountability properties (trust, admissibility, workflow correctness, governance adherence, business impact, ROI realization), not just model behavior. Logged as Phase 3 backlog item #23 for the market-positioning whitepaper / pitch.
+- **What this is NOT:**
+  - NOT real ROI — the new dim is a heuristic using published nurse rate + UM-study baseline. Real ROI is Phase 3 #22.
+  - NOT clinical accuracy — `clinical_signal_accuracy` measures signal-alignment with ground truth's `expected_overall_signal`, not full clinical correctness. PRD §1 honest limit holds.
+- **Implementation:**
+  - `DimensionScore.bucket` first-class field with __post_init__ validation
+  - 37 + 3 = 40 DimensionScore constructors carry `bucket=BUCKET_X`
+  - `eval/runner.py` print_report groups aggregate dims by bucket subsections
+  - `api/main.py` /api/v1/eval/latest parses bucket subsection headers
+  - `ui/index.html` dashboard renders 3 bucket cards with per-bucket pass/fail counts and colored dim tiles
+- **Gaps named (logged in Phase 3 backlog):**
+  - Item #20: AI Evals expansion (real accuracy / hallucination composite / benchmarks)
+  - Item #21: Observability dims (trace completeness, log integrity, latency variance score)
+  - Item #22: Real ROI from production data
+  - Item #23: Evals as enterprise-value instrumentation — market positioning
+
 ### scope-addition: RAI-aligned eval framework expansion (eval v1 → v2) — 2026-05-27
 
 - **Date logged:** 2026-05-27

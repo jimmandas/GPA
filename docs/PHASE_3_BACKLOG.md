@@ -74,6 +74,50 @@
 - **Why deferred:** User passed on judge calibration tracks in 2026-05-27 session. The path stays available.
 - **Trigger to prioritize:** Faithfulness scores need to be production-defensible to a regulator OR the daily judge starts looking like the bottleneck on detecting issues.
 
+### 20. AI Evals expansion — accuracy / hallucinations / benchmarks (Phase 3)
+
+- **Date logged:** 2026-05-28
+- **Context:** During v3 eval-framework design, identified that traditional "AI Evals" (the model-eval sub-category of the broader eval landscape) has three primitives the GPA framework doesn't fully cover: accuracy, hallucinations, benchmarks.
+- **What's missing today:**
+  - `accuracy_vs_clinical_truth` — % of cases where the AI's full clinical assessment matches a clinician-labeled correct answer. We added `clinical_signal_accuracy` in v3 as a proxy (signal-alignment with `expected_overall_signal`) but real clinical accuracy needs clinician-graded cases. PRD §1 honest limit: clinical accuracy is out of POC scope.
+  - `hallucination_rate` (composite) — single-number summary derived from `source_citation_accuracy` + `rationale_faithfulness` + `citation_correctness`. Useful for a regulator who wants "the hallucination number," not three numbers to triangulate.
+  - `benchmark_alignment_*` — runs against published benchmarks (MedQA, ASCO, USPSTF clinical-reasoning tests). Useful for cross-system comparability.
+- **Why deferred:** All three need either clinical-grader involvement (accuracy) or external benchmark integration work (benchmarks). The composite hallucination_rate is cheap to add (~30 min) but doesn't add measurement that the existing three dims don't already provide; it's a packaging improvement.
+- **Trigger to prioritize:** External evaluation by clinical advisors OR submission of the build for industry benchmarking (e.g., a payer-AI competition).
+
+### 21. Observability dims — trace completeness, log integrity (Phase 3)
+
+- **Date logged:** 2026-05-28
+- **Context:** Identified that "Observability" (traces, latency, logs) is the third traditional eval sub-category. GPA has the infrastructure (bilateral logger + Pipeline Trace UI) but no dims that SCORE observability quality.
+- **What's missing today:**
+  - `trace_completeness_rate` — % of cases where the bilateral log contains all expected event types (pre_state, 4 agent_events, 5 gate_events, post_state). Catches partial / interrupted traces.
+  - `log_integrity_rate` — % of bilateral log records that have all required fields populated (no malformed entries, no missing timestamps, no hash mismatches).
+  - `latency_variance_score` — coefficient of variation of pipeline wall time. Tail latency was added in v3 (p90); a variance number adds another reliability dimension.
+- **Why deferred:** None are blocking. The infrastructure (bilateral logger, Pipeline Trace UI) is already in production-grade shape; these dims add SCORING on top, which becomes meaningful at scale (>50 cases). At n=15, log-integrity dim would be trivially passing.
+- **Trigger to prioritize:** Production-deployment pre-flight OR observability concerns surfaced by an SRE review.
+
+### 22. Real ROI measurement (Phase 3 — bigger than item #18)
+
+- **Date logged:** 2026-05-28
+- **Context:** v3 added `estimated_roi_per_case_usd` using a heuristic (manual-review baseline × nurse hourly rate − API cost). User feedback: *"ideally we want to show ROI from the eval."* The heuristic surfaces the dimension; real ROI needs production data.
+- **What's missing today (beyond the heuristic):**
+  - Real nurse-time-per-case measurements (pre/post AI pilot)
+  - Real provider TAT measurements (pre/post)
+  - Real denial-rate / appeal-rate changes
+  - Real member-satisfaction delta
+  - Per-payer / per-region ROI breakdowns
+- **Why deferred:** All require months of production data or a pilot study with real users. Bigger than #18 Tier 2 (which is per-case dims); item #22 is the SYSTEM-LEVEL ROI story for an executive audience.
+- **Trigger to prioritize:** Pilot deployment OR a board / payer-buyer conversation needing ROI evidence.
+
+### 23. Evals as Enterprise Value Instrumentation — strategic positioning
+
+- **Date logged:** 2026-05-28
+- **Context:** During v3 design, identified that the GPA eval framework operates at a *higher level* than traditional model/agent/observability evals. It measures: trust, admissibility, workflow correctness, operational quality, governance adherence, business impact, ROI realization. This is "AI operational intelligence" — a market-positioning concept worth surfacing.
+- **What this is NOT (a Phase 3 deliverable):** It's not a feature to build. It's a positioning thesis that informs HOW the existing eval framework is described to a market.
+- **Why it's logged here:** Phase 3 may include market-facing materials (whitepaper, pitch deck, conference talk). The positioning thesis is the throughline for those.
+- **The thesis (in one sentence):** Traditional AI eval frameworks measure model behavior; enterprise-grade AI eval frameworks measure organizational accountability. The GPA framework is the second.
+- **Implementation when activated:** Whitepaper / blog post / conference submission. Maps the 16 dims to the 7 enterprise-value categories (trust, admissibility, workflow correctness, operational quality, governance adherence, business impact, ROI realization) and shows how the 3-bucket structure maps to enterprise-org questions (CFO, regulator, SRE).
+
 ### 18. Tier 2 business-value eval dims (need ground-truth fields)
 
 - **Date logged:** 2026-05-28

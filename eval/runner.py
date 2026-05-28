@@ -89,6 +89,10 @@ from eval.dimensions import (
     score_pipeline_completion_rate,
     score_estimated_cost_per_case_usd,
     score_gate_fire_distribution,
+    # v3 follow-ups (2026-05-28): ROI heuristic + latency p90 + signal accuracy
+    score_pipeline_latency_p90_seconds,
+    score_estimated_roi_per_case_usd,
+    score_clinical_signal_accuracy,
 )
 
 
@@ -252,6 +256,10 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
         score_pipeline_completion_rate(cases_for_aggregates),
         score_estimated_cost_per_case_usd(cases_for_aggregates),
         score_gate_fire_distribution(cases_for_aggregates),
+        # v3 follow-ups: ROI + latency p90 + clinical signal accuracy
+        score_pipeline_latency_p90_seconds(cases_for_aggregates),
+        score_estimated_roi_per_case_usd(cases_for_aggregates),
+        score_clinical_signal_accuracy(cases_for_aggregates),
     ]
     return eval_cases, aggregate_scores
 

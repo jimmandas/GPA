@@ -8,7 +8,7 @@ harness measures the system end-to-end.
 **Status (2026-05-28):** Phase 2 MVP — nurse-anchored governance proof. 5 hard
 control gates (admission, source_verification, ai_decision_limit, denial,
 confidence), end-to-end physician peer-review workflow, **eval framework v3 —
-16 active dimensions: 12 RAI-aligned correctness dims + 4 operational
+19 active dimensions: 12 RAI-aligned correctness dims + 4 operational
 business-value dims** (TAT proxy, cost estimate, pipeline completion rate,
 gate-fire sanity check). EVAL_TIER system (dev/Sonnet vs ship/Opus). Scope
 baseline + delta log.
@@ -16,7 +16,7 @@ baseline + delta log.
 ## Responsible AI eval framework (v3)
 
 Strategy §6 names Responsible AI as a **core system constraint, not a downstream
-review phase**. The eval framework v3 operationalizes this with 16 active dims:
+review phase**. The eval framework v3 operationalizes this with 19 active dims:
 **12 mapped to the six RAI evaluation categories** (safety, grounding, policy
 compliance, HITL, explainability, fairness) plus **4 business-value /
 operational dims** that close the OKR1 measurement gap (latency, cost, stability,
@@ -52,7 +52,7 @@ See `docs/eval-methodology.md` for the canonical reference and
 | `physician_queue/` | **(Phase 2)** PhysicianQueue ABC + FilePhysicianQueue + ActionRecord for peer review workflow |
 | `rag/` | PolicyRetriever ABC + FixtureRetriever (active). Real RAG pipeline is Phase 3 — see `docs/PHASE_3_BACKLOG.md` item #10 |
 | `logs/bilateral_logger.py` | Write-before-emit audit log (now also receives `physician_action_record` events) |
-| `eval/` | Eval harness — **16 dimensions** + ConfidenceCalibrator + EVAL_TIER system (see `docs/eval-methodology.md`) |
+| `eval/` | Eval harness — **19 dimensions** + ConfidenceCalibrator + EVAL_TIER system (see `docs/eval-methodology.md`) |
 | `api/main.py` | FastAPI app — pipeline endpoints, nurse queue/case endpoints, audit endpoints, physician queue/action endpoints |
 | `ui/*.html` | Static review UI: `queue.html` (nurse queue), `nurse_workspace.html`, `physician_queue.html`, `physician_workspace.html`, `index.html` (audit viewer). All wired to live API |
 | `prompts/` | System prompts for each agent (hash-pinned in `config/prompt_hashes.yaml`) |
@@ -115,7 +115,7 @@ SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py
 
 The `PYTHONPATH=.` is required — without it the module imports fail.
 
-Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. The **16 active dimensions** (see `docs/eval-methodology.md` for full reference):
+Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. The **19 active dimensions** (see `docs/eval-methodology.md` for full reference):
 
 | # | Dimension | Layer | Target |
 |---|---|---|---|
