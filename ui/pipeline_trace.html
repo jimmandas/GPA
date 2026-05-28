@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPA v4 · Pipeline Trace</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f6f8;
+      color: #1a1d23;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e2e5ea;
+      padding: 18px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    header p {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-buttons a {
+      background: #2563eb;
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .nav-buttons a.secondary {
+      background: #6b7280;
+    }
+
+    main {
+      padding: 24px 32px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .controls {
+      background: #fff;
+      border: 1px solid #e2e5ea;
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-end;
+    }
+
+    .controls label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+
+    .controls select, .controls button {
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: #fff;
+    }
+
+    .controls button.primary {
+      background: #2563eb;
+      color: #fff;
+      border: 0;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .controls button.primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .stage {
+      background: #fff;
+      border: 1px solid #e2e5ea;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .stage-header {
+      padding: 12px 18px;
+      background: #fafbfc;
+      border-bottom: 1px solid #e2e5ea;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .stage-num {
+      background: #2563eb;
+      color: #fff;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .stage-num.gate { background: #f59e0b; }
+    .stage-num.agent { background: #2563eb; }
+    .stage-num.logger { background: #a855f7; }
+    .stage-num.complete { background: #16a34a; }
+
+    .stage-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .stage-kind {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 2px 8px;
+      border-radius: 99px;
+      margin-left: auto;
+    }
+
+    .kind-gate { background: #fef3c7; color: #92400e; }
+    .kind-agent { background: #dbeafe; color: #1d4ed8; }
+    .kind-logger { background: #f3e8ff; color: #7e22ce; }
+    .kind-complete { background: #dcfce7; color: #15803d; }
+
+    .stage-body {
+      padding: 16px 22px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .stage-body.single {
+      grid-template-columns: 1fr;
+    }
+
+    .io-block h4 {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+
+    .io-block pre {
+      background: #f9fafb;
+      border: 1px solid #e2e5ea;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: "SF Mono", "Fira Mono", "Courier New", monospace;
+      font-size: 0.74rem;
+      line-height: 1.5;
+      color: #1f2937;
+      max-height: 260px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .stage-notes {
+      grid-column: 1 / -1;
+      font-size: 0.78rem;
+      color: #6b7280;
+      font-style: italic;
+      padding-top: 8px;
+      border-top: 1px dashed #e2e5ea;
+    }
+
+    .status-pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pill-pass { background: #dcfce7; color: #15803d; }
+    .pill-fail { background: #fee2e2; color: #b91c1c; }
+    .pill-na   { background: #f3f4f6; color: #6b7280; }
+
+    .empty {
+      padding: 48px 16px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 0.9rem;
+      background: #fff;
+      border: 1px dashed #e2e5ea;
+      border-radius: 8px;
+    }
+
+    .running {
+      padding: 28px 16px;
+      text-align: center;
+      color: #1d4ed8;
+      font-size: 0.95rem;
+      font-weight: 600;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+    }
+
+    .running::before {
+      content: "⏳ ";
+    }
+
+    .error-state {
+      padding: 18px 22px;
+      text-align: left;
+      color: #b91c1c;
+      font-size: 0.9rem;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GPA v4 · Pipeline Trace</h1>
+    <p>Submit a case, watch the agents and gates fire end-to-end.</p>
+  </div>
+  <div class="nav-buttons">
+    <a href="queue.html">Nurse Queue →</a>
+    <a class="secondary" href="nurse_workspace.html?case_id=case_0001">Nurse Workspace →</a>
+    <a class="secondary" href="index.html">Audit Log →</a>
+  </div>
+</header>
+
+<main>
+  <div class="controls">
+    <div>
+      <label for="case-picker">Case fixture</label>
+      <select id="case-picker">
+        <option value="">Loading…</option>
+      </select>
+    </div>
+    <button class="primary" id="run-btn">Submit + Run Pipeline</button>
+    <div style="margin-left:auto;font-size:0.78rem;color:#6b7280;">
+      Each run takes ~20-60 seconds (4 Claude calls + 5 gate checks).
+    </div>
+  </div>
+
+  <div id="trace-container">
+    <div class="empty">
+      Select a case fixture and click <strong>Submit + Run Pipeline</strong> to see the case journey.
+    </div>
+  </div>
+</main>
+
+<script>
+  // API_BASE: the FastAPI server is on port 8000; the static UI is on 8001.
+  const API_BASE = window.GPA_API_BASE || "http://" + window.location.hostname + ":8000";
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    })[ch]);
+  }
+
+  function jsonBlock(obj) {
+    if (obj === null || obj === undefined) return `<pre style="color:#9ca3af;">(none)</pre>`;
+    try {
+      return `<pre>${esc(JSON.stringify(obj, null, 2))}</pre>`;
+    } catch (e) {
+      return `<pre>${esc(String(obj))}</pre>`;
+    }
+  }
+
+  async function loadCaseList() {
+    const select = document.getElementById("case-picker");
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/nurse/queue`);
+      const data = await res.json();
+      const cases = (data.cases || []).sort((a, b) => a.case_id.localeCompare(b.case_id));
+      select.innerHTML = cases.map(c =>
+        `<option value="${esc(c.case_id)}">${esc(c.case_id)} — ${esc(c.indication_category || c.modality || "")}</option>`
+      ).join("");
+    } catch (err) {
+      select.innerHTML = `<option value="">(failed to load: ${esc(err)})</option>`;
+    }
+  }
+
+  function renderStage(num, name, kind, inputObj, outputObj, notes) {
+    const status = notes && notes.status
+      ? `<span class="status-pill pill-${notes.status}">${esc(notes.status)}</span>`
+      : "";
+    return `
+      <div class="stage">
+        <div class="stage-header">
+          <span class="stage-num ${kind}">${num}</span>
+          <span class="stage-name">${esc(name)}</span>
+          <span class="stage-kind kind-${kind}">${esc(kind)}</span>
+          ${status}
+        </div>
+        <div class="stage-body">
+          <div class="io-block">
+            <h4>Input</h4>
+            ${jsonBlock(inputObj)}
+          </div>
+          <div class="io-block">
+            <h4>Output</h4>
+            ${jsonBlock(outputObj)}
+          </div>
+          ${notes && notes.text ? `<div class="stage-notes">${esc(notes.text)}</div>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTrace(submission, det) {
+    // Pull stage outputs from the determination
+    const findings = det.findings;
+    const context = det.context;
+    const policyMap = det.policy_map;
+    const brief = det.reasoning_brief;
+
+    const stages = [];
+
+    // Stage 1: Admission Gate
+    stages.push(renderStage(1, "Admission Gate", "gate",
+      { case_id: submission.case_id, "required fields present": "checked" },
+      { admitted: true, missing_fields: [] },
+      { status: "pass", text: "Field completeness check (pure function, no LLM)." }
+    ));
+
+    // Stage 2: Evidence Summarizer
+    stages.push(renderStage(2, "Evidence Summarizer Agent", "agent",
+      submission,
+      findings,
+      { text: "temperature=0, max_turns=1, no tools. Pre-fetch retrieval pattern (ADR-004)." }
+    ));
+
+    // Stage 3: Context Retriever
+    stages.push(renderStage(3, "Context Retriever Agent", "agent",
+      { case_id: submission.case_id, patient_id: (submission.patient || {}).patient_id, findings },
+      context,
+      { text: "Calls patient_history_lookup + prior_imaging_lookup (pre-fetched). temperature=0, max_turns=1." }
+    ));
+
+    // Stage 4: Policy Mapper
+    stages.push(renderStage(4, "Policy Mapper Agent", "agent",
+      { findings, context, indication_category: (findings || {}).indication_category },
+      policyMap,
+      { text: "Calls nccn_passage_lookup via PolicyRetriever (FixtureRetriever). Direct anthropic SDK with temperature=0 (ADR-010)." }
+    ));
+
+    // Stage 4.5: Confidence Gate (5th gate)
+    const ambigCount = (policyMap?.criteria || []).filter(c => ["ambiguous", "unmet"].includes(c?.status)).length;
+    const overallSig = policyMap?.overall_signal;
+    const confPassed = overallSig !== "ambiguous" && ambigCount <= 2;
+    stages.push(renderStage(5, "Confidence Gate", "gate",
+      { overall_signal: overallSig, ambiguous_or_unmet_count: ambigCount },
+      { passed: confPassed, threshold: 2, violations: confPassed ? [] : ["confidence_too_low"] },
+      { status: confPassed ? "pass" : "fail",
+        text: "ADR-015. Fires if overall_signal==ambiguous OR >2 ambiguous/unmet criteria." }
+    ));
+
+    // Stage 5: Reasoning Drafter
+    stages.push(renderStage(6, "Reasoning Drafter Agent", "agent",
+      { findings, context, policy_map: policyMap },
+      brief,
+      { text: "temperature=0, max_turns=1, no tools. Output schema has NO decision field (architectural)." }
+    ));
+
+    // Stage 6: Source Verification Gate
+    const briefSrcRefs = (brief?.supporting_evidence || []).map(e => e?.source_ref);
+    stages.push(renderStage(7, "Source Verification Gate", "gate",
+      { claims_to_verify: briefSrcRefs.length, claim_source_refs: briefSrcRefs },
+      { passed: true, violations: [] },
+      { status: "pass", text: "ADR-006. Every claim must cite a verifiable source_ref. Pure function (no LLM)." }
+    ));
+
+    // Stage 7: AI-Decision-Limit Gate
+    stages.push(renderStage(8, "AI-Decision-Limit Gate", "gate",
+      { agent_outputs_checked: ["findings", "context", "policy_map", "reasoning_brief"] },
+      { passed: true, violations: [] },
+      { status: "pass", text: "ADR-007. Asserts no agent ever emits 'decision', 'recommendation', or 'confidence' fields." }
+    ));
+
+    // Stage 8: Bilateral Logger pre-write
+    stages.push(renderStage(9, "Bilateral Logger (pre-state)", "logger",
+      { case_id: submission.case_id, agent_hashes: "computed", gate_results: "all-passed" },
+      { type: "pre_state_record", durable: true, audit_log_ref: det.audit_log_ref },
+      { text: "Write-before-emit (ADR-005). fsync to disk before returning determination." }
+    ));
+
+    // Stage 9: Determination → Nurse Queue
+    stages.push(renderStage(10, "Determination → Nurse Queue", "complete",
+      { case_id: submission.case_id, all_stages: "complete" },
+      { status: "pending_nurse_review", audit_log_ref: det.audit_log_ref },
+      { status: "pass", text: "Brief is now visible in the nurse queue. The nurse decides; the AI does not." }
+    ));
+
+    document.getElementById("trace-container").innerHTML = stages.join("");
+  }
+
+  async function runPipeline() {
+    const caseId = document.getElementById("case-picker").value;
+    const container = document.getElementById("trace-container");
+    const btn = document.getElementById("run-btn");
+
+    if (!caseId) {
+      container.innerHTML = `<div class="error-state">Select a case fixture first.</div>`;
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Running…";
+    container.innerHTML = `<div class="running">Pipeline running on ${esc(caseId)}: 4 Claude calls + 5 gates. Usually 20-60 seconds.</div>`;
+
+    try {
+      // 1. Fetch the submission
+      const subRes = await fetch(`${API_BASE}/api/v1/nurse/case/${encodeURIComponent(caseId)}`);
+      if (!subRes.ok) throw new Error(`could not load case (HTTP ${subRes.status})`);
+      const subData = await subRes.json();
+      const submission = subData.submission;
+
+      // 2. POST to /decide
+      const decRes = await fetch(`${API_BASE}/api/v1/pa/decide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(submission),
+      });
+      const result = await decRes.json();
+      if (!decRes.ok) {
+        container.innerHTML = `<div class="error-state">Pipeline error (HTTP ${decRes.status}): ${esc(result.detail || decRes.statusText)}</div>`;
+        return;
+      }
+      if (result.status !== "completed" || !result.determination) {
+        container.innerHTML = `<div class="error-state">Pipeline status: <strong>${esc(result.status)}</strong>${result.escalation_reason ? " — " + esc(result.escalation_reason) : ""}.</div>`;
+        return;
+      }
+
+      renderTrace(submission, result.determination);
+    } catch (err) {
+      container.innerHTML = `<div class="error-state">Network error: ${esc(String(err))}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Submit + Run Pipeline";
+    }
+  }
+
+  document.getElementById("run-btn").addEventListener("click", runPipeline);
+  loadCaseList();
+</script>
+
+</body>
+</html>

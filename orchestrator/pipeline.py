@@ -180,12 +180,17 @@ async def _run_async(submission: dict) -> PipelineResult:
         # If this raises BilateralLoggerError → propagates up, do not emit
 
         # STEP 9 — Return reasoning_brief for nurse review
+        # The full per-agent outputs are returned so a pipeline-trace UI
+        # can show every stage. Production-mode consumers ignore the
+        # findings field and read only reasoning_brief + policy_map +
+        # context (the nurse-facing data).
         determination = {
             "case_id": case_id,
             "status": "pending_nurse_review",
-            "reasoning_brief": reasoning_brief,
-            "policy_map": policy_map,
+            "findings": findings,
             "context": context,
+            "policy_map": policy_map,
+            "reasoning_brief": reasoning_brief,
             "audit_log_ref": f"decision_log/{case_id}.jsonl"
         }
 
