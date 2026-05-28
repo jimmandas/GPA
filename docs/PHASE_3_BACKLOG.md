@@ -135,8 +135,8 @@
   - `actual_provider_TAT_minutes` — measured from real provider submission → notification timestamps
   - `actual_member_satisfaction_delta` — pre/post member surveys
   - `appeal_rate_change` — operational outcome over months
-  - `production_token_cost_actual` — real SDK telemetry replacing the v3 heuristic
-- **Why deferred:** All four require months of operational data. Out of scope for Phase 2 (POC) and Phase 3 (until a real pilot).
+  - ~~`production_token_cost_actual` — real SDK telemetry replacing the v3 heuristic~~ — **PULLED FORWARD to Phase 2 — 2026-05-28.** `orchestrator/telemetry.py` ContextVar collector now captures per-agent-call `total_cost_usd` + token counts from the SDK; `score_estimated_cost_per_case_usd` prefers real telemetry when available, falls back to heuristic when not (unit mode / mocked SDK).
+- **Why deferred:** The remaining three require months of operational data. Out of scope for Phase 2 (POC) and Phase 3 (until a real pilot).
 - **Trigger to prioritize:** Live production pilot OR commitment to operational outcomes claims that need actuals not estimates.
 
 ### 17. Opus reasoning_drafter JSON parse stability
@@ -192,3 +192,22 @@
 - **Why deferred:** Statistical power is a calibration concern, not a governance-proof concern. The architecture works on 15 cases; scaling the dataset doesn't change what the system proves.
 - **Trigger to prioritize:** Multi-rater labeling at scale (#4) lands OR the eval results need tighter confidence intervals for a specific portfolio claim.
 - **Implication for the eval report:** The current report should explicitly name "n=15" as a limitation, with the scope §7 target (25-30) and Phase 2 plan target (50-75) cited as what production-grade evidence would require.
+
+### 24. Gold-standard honest-limits section in EVAL_WRITEUP / SCOPE_BASELINE
+
+- **Date logged:** 2026-05-28 (deferred from a small same-session ask)
+- **What:** Add an explicit "Gold-standard limits" subsection to `docs/EVAL_WRITEUP.md` and `docs/SCOPE_BASELINE.md` enumerating what the ground-truth dataset is and is NOT:
+  - **Number of raters:** 1 (Jim only) — no inter-rater validation
+  - **Source:** synthesized from NCCN guidelines + de-identified patterns, not real (de-identified) past PA submissions
+  - **Domain SME sign-off:** none — no oncologist / radiologist reviewed the labels
+  - **Sample size:** 15 cases (scope target was 25-30; production needs hundreds)
+  - **External validation:** none — no comparison to actual payer PA decisions
+  - **What this could miss:** any case where the labeler's NCCN read is wrong; "judgment_intensive" labels a clinical reviewer might categorize differently; adversarial vectors a real attacker would find
+- **Why this matters:** PM-honest framing for portfolio defensibility. The strength isn't "validated gold standard" (we don't have one) — it's "transparent gold standard with named limits; eval surfaces real failures even with an imperfect baseline." More credible than claiming validated ground truth.
+- **Why deferred:** small docs change, not blocking the Loom. The underlying limits are already documented across `SCOPE_DELTAS.md` (cohens-removal rationale) and `SCOPE_BASELINE.md` (n=15 cuts); this would centralize them into a single user-facing section.
+- **Trigger to prioritize:** before sharing `EVAL_WRITEUP.md` externally, or when hiring-manager-facing surface area expands beyond the dashboard + Loom.
+- **Path to "more right" in priority order** (name when this lands):
+  1. **Radiologist + oncologist sign-off on existing 15 labels** — ~2-4 hours of expert time; highest signal-per-dollar
+  2. **Cohen's κ track** (Jim + Pax dual labeling) — ~10 person-hours; explicitly killed 2026-05-28 because it's a meta-eval
+  3. **Dataset expansion to 25-30 cases** — strengthens every dim; cut from Phase 2
+  4. **De-identified real PA decisions ingestion** — Phase 3 / data-share agreement

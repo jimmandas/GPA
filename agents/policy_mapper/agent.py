@@ -195,7 +195,7 @@ def _get_anthropic_client():
     return _anthropic_client
 
 
-async def _call_via_anthropic_direct(user_prompt: str) -> str:
+async def _call_via_anthropic_direct(user_prompt: str) -> tuple[str, dict]:
     """
     v3 path: direct anthropic SDK with temperature=0.
 
@@ -203,6 +203,10 @@ async def _call_via_anthropic_direct(user_prompt: str) -> str:
     temperature parameter). Used for policy_mapper specifically because
     its per-criterion judgments are the dominant source of reproducibility
     flakiness on judgment-intensive cases (see v1-to-v2-delta.md).
+
+    Returns (text, telemetry). telemetry has input_tokens / output_tokens
+    from response.usage. No total_cost_usd — anthropic SDK doesn't return it;
+    cost is computed downstream from tokens × pinned model rates.
     """
     client = _get_anthropic_client()
     response = await client.messages.create(
@@ -213,18 +217,28 @@ async def _call_via_anthropic_direct(user_prompt: str) -> str:
         messages=[{"role": "user", "content": user_prompt}],
     )
     text_parts = [block.text for block in response.content if hasattr(block, "text")]
-    return "".join(text_parts)
+    telemetry: dict = {}
+    usage = getattr(response, "usage", None)
+    if usage is not None:
+        telemetry["input_tokens"] = int(getattr(usage, "input_tokens", 0)) or None
+        telemetry["output_tokens"] = int(getattr(usage, "output_tokens", 0)) or None
+    return "".join(text_parts), telemetry
 
 
-async def _call_via_claude_agent_sdk(user_prompt: str) -> str:
-    """v2 (default) path: claude_agent_sdk via CLI subprocess."""
+async def _call_via_claude_agent_sdk(user_prompt: str) -> tuple[str, dict]:
+    """v2 (default) path: claude_agent_sdk via CLI subprocess. Returns (text, telemetry)."""
+    from orchestrator.telemetry import extract_usage_from_message
     final_text = ""
+    telemetry: dict = {}
     async for message in query(prompt=user_prompt, options=_AGENT_OPTIONS):
         if hasattr(message, "content") and message.content:
             for block in message.content:
                 if hasattr(block, "text"):
                     final_text += block.text
-    return final_text
+        extracted = extract_usage_from_message(message)
+        if extracted:
+            telemetry.update(extracted)
+    return final_text, telemetry
 
 
 # ---------------------------------------------------------------------------
@@ -362,12 +376,13 @@ async def run(findings: dict, context: dict, case_id: str) -> dict:
     sdk_used = "anthropic-direct" if _USE_ANTHROPIC_DIRECT else "claude_agent_sdk"
     sdk_exception: Exception | None = None
     final_text: str = ""
+    telemetry: dict = {}
 
     try:
         if _USE_ANTHROPIC_DIRECT:
-            final_text = await _call_via_anthropic_direct(user_prompt)
+            final_text, telemetry = await _call_via_anthropic_direct(user_prompt)
         else:
-            final_text = await _call_via_claude_agent_sdk(user_prompt)
+            final_text, telemetry = await _call_via_claude_agent_sdk(user_prompt)
     except PolicyMapperError:
         raise
     except Exception as exc:
@@ -378,6 +393,17 @@ async def run(findings: dict, context: dict, case_id: str) -> dict:
         output_hash = _sha256_hex("")
     else:
         output_hash = _sha256_hex(final_text) if final_text.strip() else _sha256_hex("")
+
+    # Record telemetry for eval cost dim
+    from orchestrator.telemetry import record_agent_call
+    record_agent_call(
+        "policy_mapper",
+        input_tokens=telemetry.get("input_tokens"),
+        output_tokens=telemetry.get("output_tokens"),
+        total_cost_usd=telemetry.get("total_cost_usd"),
+        duration_ms=telemetry.get("duration_ms"),
+        sdk="anthropic_direct" if _USE_ANTHROPIC_DIRECT else "claude_agent_sdk",
+    )
 
     # --- Write agent_event BEFORE raising ----------------------------------
     agent_event: dict = {
@@ -391,6 +417,9 @@ async def run(findings: dict, context: dict, case_id: str) -> dict:
         "user_prompt_hash": user_prompt_hash,
         "tool_calls_made": tool_calls_made,
         "output_hash": output_hash if sdk_exception is None else None,
+        "input_tokens": telemetry.get("input_tokens"),
+        "output_tokens": telemetry.get("output_tokens"),
+        "total_cost_usd": telemetry.get("total_cost_usd"),
         "at": _now_iso(),
     }
     get_logger().commit(case_id, agent_event)

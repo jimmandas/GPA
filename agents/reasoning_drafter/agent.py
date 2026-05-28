@@ -143,15 +143,17 @@ def _sha256_hex(text: str) -> str:
 # SDK call layer
 # ---------------------------------------------------------------------------
 
-async def _call_reasoning_drafter(user_prompt: str) -> str:
+async def _call_reasoning_drafter(user_prompt: str) -> tuple[str, dict]:
     """
-    Invoke the Claude SDK and return the raw text response.
+    Invoke the Claude SDK and return (raw_text, telemetry).
 
     Raises:
         ReasoningDrafterError("sdk_error", ...) on SDK exception.
         ReasoningDrafterError("empty_response", ...) if response is blank.
     """
+    from orchestrator.telemetry import extract_usage_from_message
     final_text = ""
+    telemetry: dict = {}
     async for message in query(
         prompt=user_prompt,
         options=_AGENT_OPTIONS,
@@ -160,8 +162,11 @@ async def _call_reasoning_drafter(user_prompt: str) -> str:
             for block in message.content:
                 if hasattr(block, "text"):
                     final_text += block.text
+        extracted = extract_usage_from_message(message)
+        if extracted:
+            telemetry.update(extracted)
 
-    return final_text
+    return final_text, telemetry
 
 
 # ---------------------------------------------------------------------------
@@ -201,9 +206,10 @@ async def run(findings: dict, context: dict, policy_map: dict, case_id: str) -> 
     # --- SDK call -----------------------------------------------------------
     sdk_exception: Exception | None = None
     final_text: str = ""
+    telemetry: dict = {}
 
     try:
-        final_text = await _call_reasoning_drafter(user_prompt)
+        final_text, telemetry = await _call_reasoning_drafter(user_prompt)
     except Exception as exc:
         sdk_exception = exc
 
@@ -212,6 +218,17 @@ async def run(findings: dict, context: dict, policy_map: dict, case_id: str) -> 
         output_hash = _sha256_hex("")
     else:
         output_hash = _sha256_hex(final_text) if final_text.strip() else _sha256_hex("")
+
+    # Record telemetry for eval cost dim
+    from orchestrator.telemetry import record_agent_call
+    record_agent_call(
+        "reasoning_drafter",
+        input_tokens=telemetry.get("input_tokens"),
+        output_tokens=telemetry.get("output_tokens"),
+        total_cost_usd=telemetry.get("total_cost_usd"),
+        duration_ms=telemetry.get("duration_ms"),
+        sdk="claude_agent_sdk",
+    )
 
     # --- Write agent_event BEFORE raising -----------------------------------
     agent_event: dict = {
@@ -223,6 +240,9 @@ async def run(findings: dict, context: dict, policy_map: dict, case_id: str) -> 
         "user_prompt_hash": user_prompt_hash,
         "output_hash": output_hash,
         "tool_calls_made": [],
+        "input_tokens": telemetry.get("input_tokens"),
+        "output_tokens": telemetry.get("output_tokens"),
+        "total_cost_usd": telemetry.get("total_cost_usd"),
         "at": _now_iso(),
     }
     get_logger().commit(case_id, agent_event)

@@ -143,9 +143,12 @@ def _sha256_hex(text: str) -> str:
 # SDK call layer
 # ---------------------------------------------------------------------------
 
-async def _call_evidence_summarizer(submission: dict) -> str:
+async def _call_evidence_summarizer(submission: dict) -> tuple[str, dict]:
     """
-    Invoke the Claude SDK and return the raw text response.
+    Invoke the Claude SDK and return (raw_text, telemetry).
+
+    Telemetry is the per-call usage dict pulled off the terminal ResultMessage
+    (when the SDK emits one). Empty dict when the call layer is mocked in tests.
 
     Raises:
         EvidenceSummarizerError("sdk_error", ...) on SDK exception.
@@ -154,6 +157,7 @@ async def _call_evidence_summarizer(submission: dict) -> str:
     user_prompt = json.dumps(submission, separators=(",", ":"), sort_keys=True)
 
     final_text = ""
+    telemetry: dict = {}
     async for message in query(
         prompt=user_prompt,
         options=_AGENT_OPTIONS,
@@ -162,8 +166,13 @@ async def _call_evidence_summarizer(submission: dict) -> str:
             for block in message.content:
                 if hasattr(block, "text"):
                     final_text += block.text
+        # ResultMessage carries total_cost_usd + usage; capture if present.
+        from orchestrator.telemetry import extract_usage_from_message
+        extracted = extract_usage_from_message(message)
+        if extracted:
+            telemetry.update(extracted)
 
-    return final_text
+    return final_text, telemetry
 
 
 # ---------------------------------------------------------------------------
@@ -194,9 +203,10 @@ async def run(submission: dict, case_id: str) -> dict:
     # --- SDK call -----------------------------------------------------------
     sdk_exception: Exception | None = None
     final_text: str = ""
+    telemetry: dict = {}
 
     try:
-        final_text = await _call_evidence_summarizer(submission)
+        final_text, telemetry = await _call_evidence_summarizer(submission)
     except Exception as exc:
         sdk_exception = exc
 
@@ -205,6 +215,17 @@ async def run(submission: dict, case_id: str) -> dict:
         output_hash = _sha256_hex("")
     else:
         output_hash = _sha256_hex(final_text) if final_text.strip() else _sha256_hex("")
+
+    # Record telemetry for the eval cost dim (no-op when called outside pipeline)
+    from orchestrator.telemetry import record_agent_call
+    record_agent_call(
+        "evidence_summarizer",
+        input_tokens=telemetry.get("input_tokens"),
+        output_tokens=telemetry.get("output_tokens"),
+        total_cost_usd=telemetry.get("total_cost_usd"),
+        duration_ms=telemetry.get("duration_ms"),
+        sdk="claude_agent_sdk",
+    )
 
     # --- Write agent_event BEFORE raising (§4, §5 step 7) ------------------
     agent_event: dict = {
@@ -217,6 +238,9 @@ async def run(submission: dict, case_id: str) -> dict:
         "output_hash": output_hash if sdk_exception is None else None,
         "tool_calls_made": [],
         "raw_response_length": len(final_text) if sdk_exception is None else 0,
+        "input_tokens": telemetry.get("input_tokens"),
+        "output_tokens": telemetry.get("output_tokens"),
+        "total_cost_usd": telemetry.get("total_cost_usd"),
         "at": _now_iso(),
     }
     get_logger().commit(case_id, agent_event)

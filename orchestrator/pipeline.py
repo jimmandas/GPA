@@ -44,6 +44,10 @@ class PipelineResult:
     determination: dict | None   # None if escalated or failed
     escalation_reason: str | None
     audit_log_ref: str           # path to decision_log/{case_id}.jsonl
+    # Per-agent SDK telemetry captured during this run. Populated by the
+    # orchestrator from the ContextVar collector. Empty list if no SDK calls
+    # surfaced telemetry (e.g., tests with mocked SDK responses).
+    agent_telemetry: list[dict] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +113,12 @@ def run_pipeline(submission: dict) -> PipelineResult:
 async def _run_async(submission: dict) -> PipelineResult:
     """The actual pipeline — all steps run in sequence."""
 
+    # STEP 0 — Start fresh per-run telemetry collection. Each agent appends
+    # one record per SDK call; we attach the collected list to PipelineResult
+    # at the end so the eval can compute real per-case cost.
+    from orchestrator import telemetry as _telemetry
+    _telemetry.start_collection()
+
     # STEP 1 — Extract case_id and patient_id
     case_id = submission.get("case_id", "unknown")
     patient_id = submission.get("patient", {}).get("patient_id", "unknown")
@@ -122,7 +132,8 @@ async def _run_async(submission: dict) -> PipelineResult:
                 status="escalated",
                 determination=None,
                 escalation_reason=f"admission_gate_failed: {result.missing_fields}",
-                audit_log_ref=f"decision_log/{case_id}.jsonl"
+                audit_log_ref=f"decision_log/{case_id}.jsonl",
+                agent_telemetry=_telemetry.get_collected(),
             )
 
         # STEP 3 — Evidence Summarizer (Agent 1)
@@ -153,7 +164,8 @@ async def _run_async(submission: dict) -> PipelineResult:
                 status="escalated",
                 determination=None,
                 escalation_reason=f"confidence_gate_failed: {conf_result.violations}",
-                audit_log_ref=f"decision_log/{case_id}.jsonl"
+                audit_log_ref=f"decision_log/{case_id}.jsonl",
+                agent_telemetry=_telemetry.get_collected(),
             )
 
         # STEP 6 — Reasoning Drafter (Agent 4)
@@ -169,7 +181,8 @@ async def _run_async(submission: dict) -> PipelineResult:
                 status="escalated",
                 determination=None,
                 escalation_reason=f"source_verification_failed: {sv_result.violations}",
-                audit_log_ref=f"decision_log/{case_id}.jsonl"
+                audit_log_ref=f"decision_log/{case_id}.jsonl",
+                agent_telemetry=_telemetry.get_collected(),
             )
 
         # STEP 8 — Bilateral Logger PRE-WRITE (write-before-emit)
@@ -199,7 +212,8 @@ async def _run_async(submission: dict) -> PipelineResult:
             status="completed",
             determination=determination,
             escalation_reason=None,
-            audit_log_ref=f"decision_log/{case_id}.jsonl"
+            audit_log_ref=f"decision_log/{case_id}.jsonl",
+            agent_telemetry=_telemetry.get_collected(),
         )
 
     except (BilateralLoggerError, AIDecisionAttemptError) as exc:
@@ -208,7 +222,8 @@ async def _run_async(submission: dict) -> PipelineResult:
             status="failed",
             determination=None,
             escalation_reason=str(exc),
-            audit_log_ref=f"decision_log/{case_id}.jsonl"
+            audit_log_ref=f"decision_log/{case_id}.jsonl",
+            agent_telemetry=_telemetry.get_collected(),
         )
     except Exception as exc:
         return PipelineResult(
@@ -216,7 +231,8 @@ async def _run_async(submission: dict) -> PipelineResult:
             status="failed",
             determination=None,
             escalation_reason=f"unexpected_error: {exc}",
-            audit_log_ref=f"decision_log/{case_id}.jsonl"
+            audit_log_ref=f"decision_log/{case_id}.jsonl",
+            agent_telemetry=_telemetry.get_collected(),
         )
 
 

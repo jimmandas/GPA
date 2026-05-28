@@ -277,13 +277,18 @@ async def run(findings: dict, patient_id: str, case_id: str) -> dict:
     # --- SDK call -----------------------------------------------------------
     sdk_exception: Exception | None = None
     final_text: str = ""
+    telemetry: dict = {}
 
     try:
+        from orchestrator.telemetry import extract_usage_from_message
         async for message in query(prompt=user_prompt, options=_AGENT_OPTIONS):
             if hasattr(message, "content") and message.content:
                 for block in message.content:
                     if hasattr(block, "text"):
                         final_text += block.text
+            extracted = extract_usage_from_message(message)
+            if extracted:
+                telemetry.update(extracted)
     except ContextRetrieverError:
         raise
     except Exception as exc:
@@ -295,6 +300,17 @@ async def run(findings: dict, patient_id: str, case_id: str) -> dict:
     else:
         output_hash = _sha256_hex(final_text) if final_text.strip() else _sha256_hex("")
 
+    # Record telemetry for eval cost dim (no-op outside pipeline)
+    from orchestrator.telemetry import record_agent_call
+    record_agent_call(
+        "context_retriever",
+        input_tokens=telemetry.get("input_tokens"),
+        output_tokens=telemetry.get("output_tokens"),
+        total_cost_usd=telemetry.get("total_cost_usd"),
+        duration_ms=telemetry.get("duration_ms"),
+        sdk="claude_agent_sdk",
+    )
+
     # --- Write agent_event BEFORE raising ----------------------------------
     agent_event: dict = {
         "type": "agent_event",
@@ -305,6 +321,9 @@ async def run(findings: dict, patient_id: str, case_id: str) -> dict:
         "user_prompt_hash": user_prompt_hash,
         "tool_calls_made": tool_calls_made,
         "output_hash": output_hash if sdk_exception is None else None,
+        "input_tokens": telemetry.get("input_tokens"),
+        "output_tokens": telemetry.get("output_tokens"),
+        "total_cost_usd": telemetry.get("total_cost_usd"),
         "at": _now_iso(),
     }
     get_logger().commit(case_id, agent_event)

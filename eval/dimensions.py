@@ -1088,14 +1088,104 @@ def score_pipeline_completion_rate(cases: list[dict]) -> DimensionScore:
     )
 
 
+def _compute_cost_from_real_telemetry(
+    cases: list[dict],
+    agent_model: str,
+    agent_rates: dict,
+    judge_rates: dict,
+) -> tuple[float, dict, str] | None:
+    """
+    Compute REAL per-case cost from SDK telemetry.
+
+    Returns (cost_per_case_avg, breakdown, notes) when telemetry was captured,
+    or None if no case has telemetry (falls back to heuristic).
+
+    Per-case cost = mean across reps of (sum of agent SDK costs).
+    Real telemetry source:
+      - claude_agent_sdk path: ResultMessage.total_cost_usd (when present)
+      - anthropic-direct path (policy_mapper): tokens × pinned rates
+    Suite-wide cost = mean of per-case costs.
+    """
+    per_case_costs: list[float] = []
+    per_case_reasoning: list[float] = []
+    per_case_retrieval: list[float] = []  # always 0 today (mocked tools)
+    per_case_judge: list[float] = []
+    n_agent_calls = 0
+    n_cases_with_telemetry = 0
+    judge_in  = _TOKENS_PER_JUDGE_CALL_INPUT
+    judge_out = _TOKENS_PER_JUDGE_CALL_OUTPUT
+    judge_cost_per_case = (
+        (judge_in  * judge_rates["input"])  / 1_000_000 +
+        (judge_out * judge_rates["output"]) / 1_000_000
+    )
+
+    for c in cases:
+        runs = c.get("pipeline_run_telemetry") or []
+        if not runs:
+            continue
+        rep_costs: list[float] = []
+        rep_reasoning: list[float] = []
+        for rep in runs:
+            if not isinstance(rep, list) or not rep:
+                continue
+            rep_cost = 0.0
+            for call in rep:
+                n_agent_calls += 1
+                # Prefer SDK-reported cost; fall back to tokens × rates
+                sdk_cost = call.get("total_cost_usd")
+                if isinstance(sdk_cost, (int, float)):
+                    rep_cost += float(sdk_cost)
+                    continue
+                in_tok  = call.get("input_tokens") or 0
+                out_tok = call.get("output_tokens") or 0
+                rep_cost += (
+                    in_tok  * agent_rates["input"]  / 1_000_000 +
+                    out_tok * agent_rates["output"] / 1_000_000
+                )
+            if rep_cost > 0:
+                rep_costs.append(rep_cost)
+                rep_reasoning.append(rep_cost)
+        if rep_costs:
+            n_cases_with_telemetry += 1
+            avg_reasoning = sum(rep_reasoning) / len(rep_reasoning)
+            # Per case = reasoning (real) + retrieval (0) + judge (1 call/case)
+            per_case_reasoning.append(avg_reasoning)
+            per_case_retrieval.append(0.0)
+            per_case_judge.append(judge_cost_per_case)
+            per_case_costs.append(avg_reasoning + judge_cost_per_case)
+
+    if not per_case_costs:
+        return None
+
+    avg = sum(per_case_costs) / len(per_case_costs)
+    avg_reasoning = sum(per_case_reasoning) / len(per_case_reasoning)
+    avg_retrieval = 0.0
+    avg_judge = judge_cost_per_case
+    breakdown = {
+        "reasoning_usd":       round(avg_reasoning, 4),
+        "retrieval_usd":       round(avg_retrieval, 4),
+        "judge_eval_only_usd": round(avg_judge, 4),
+    }
+    notes = (
+        f"~${avg:.3f}/case (mean over {n_cases_with_telemetry} cases × ~5 reps "
+        f"= {n_agent_calls} agent calls; REAL SDK telemetry). "
+        f"Reasoning ${avg_reasoning:.3f} + Retrieval ${avg_retrieval:.3f} "
+        f"(tool fixtures mocked) + Judge ${avg_judge:.3f} (eval-only GPT-4o)."
+    )
+    return avg, breakdown, notes
+
+
 def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
     """
-    Estimated USD cost per case (5-run avg) at current model rates.
+    USD cost per case. Prefers REAL SDK telemetry (captured via orchestrator/
+    telemetry.py) when available, falls back to heuristic when not.
 
-    Heuristic — uses per-call token estimates × pinned model rates. Real
-    per-call telemetry from the SDK is a Phase 3 refinement.
-    Target: <$2.00/case — informational order-of-magnitude.
-    Maps to OKR1 admin cost reduction.
+    Real telemetry uses per-agent-call total_cost_usd / token counts from the
+    SDK responses. The heuristic uses per-call token estimates × pinned model
+    rates and produces ONE constant for all cases — fine as an order-of-magnitude
+    sanity check, useless for case-by-case variation.
+
+    Target: <$2.00/case — informational. Maps to OKR1 admin cost reduction.
     """
     target = "<$2.00"
     dim = "estimated_cost_per_case_usd"
@@ -1123,25 +1213,32 @@ def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
             bucket=BUCKET_VALUE,
         )
 
+    # --- Real-telemetry path (preferred) -----------------------------------
+    real = _compute_cost_from_real_telemetry(cases, agent_model, agent_rates, judge_rates)
+    if real is not None:
+        cost_per_case, breakdown, notes = real
+        return DimensionScore(
+            dimension=dim,
+            score=cost_per_case,
+            target=target,
+            passed=cost_per_case < 2.00,
+            notes=notes,
+            is_aggregate=True,
+            bucket=BUCKET_VALUE,
+            breakdown=breakdown,
+        )
+
+    # --- Heuristic fallback (no SDK telemetry available) -------------------
     in_per_case  = _REPRODUCIBILITY_RUNS * _AGENTS_PER_RUN * _TOKENS_PER_AGENT_CALL_INPUT
     out_per_case = _REPRODUCIBILITY_RUNS * _AGENTS_PER_RUN * _TOKENS_PER_AGENT_CALL_OUTPUT
     judge_in     = _TOKENS_PER_JUDGE_CALL_INPUT
     judge_out    = _TOKENS_PER_JUDGE_CALL_OUTPUT
 
-    # Sub-bucket the cost so the Value card / ROI explanation is transparent:
-    #   reasoning  — 4 agents × 5 reps × Claude tokens. The bulk.
-    #   retrieval  — tool calls (patient_history_lookup, prior_imaging_lookup,
-    #                nccn_passage_lookup). FIXTURE-MOCKED today, so $0. In
-    #                production this becomes pgvector / EHR API cost
-    #                (~$0.001–$0.01/case). We expose the bucket NOW so the
-    #                framework is honest about what's missing.
-    #   judge      — 1 GPT-4o call per case for rationale_faithfulness.
-    #                EVAL-ONLY — does NOT show up in production cost.
     reasoning_cost = (
         (in_per_case  * agent_rates["input"])  / 1_000_000 +
         (out_per_case * agent_rates["output"]) / 1_000_000
     )
-    retrieval_cost = 0.0  # mocked; placeholder for production telemetry
+    retrieval_cost = 0.0
     judge_cost = (
         (judge_in  * judge_rates["input"])  / 1_000_000 +
         (judge_out * judge_rates["output"]) / 1_000_000
@@ -1164,7 +1261,8 @@ def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
             f"Reasoning ${reasoning_cost:.3f} (4 agents × 5 reps) + "
             f"Retrieval ${retrieval_cost:.3f} (tool fixtures mocked; prod ~$0.001/case) + "
             f"Judge ${judge_cost:.3f} (eval-only GPT-4o). "
-            "Heuristic; real telemetry is Phase 3."
+            "HEURISTIC — no SDK telemetry captured (unit mode / mocked SDK). "
+            "Run live eval for real per-case cost."
         ),
         is_aggregate=True,
         bucket=BUCKET_VALUE,

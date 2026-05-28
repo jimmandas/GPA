@@ -121,6 +121,11 @@ class EvalCase:
     # Length matches REPRODUCIBILITY_RUNS for live cases; empty in unit mode.
     pipeline_run_wall_seconds: list[float] = None  # type: ignore[assignment]
     pipeline_run_statuses: list[str] = None        # type: ignore[assignment]
+    # Per-run agent SDK telemetry (eval framework v3+ — 2026-05-28). Each entry
+    # is the list of per-agent-call dicts returned by PipelineResult.agent_telemetry.
+    # Used by score_estimated_cost_per_case_usd to compute REAL per-case cost
+    # from actual token usage / SDK cost data instead of the heuristic constant.
+    pipeline_run_telemetry: list[list[dict]] = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +237,8 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
             # Tier 1 business-value telemetry (eval framework v3)
             "pipeline_run_wall_seconds": ec.pipeline_run_wall_seconds or [],
             "pipeline_run_statuses": ec.pipeline_run_statuses or [],
+            # Per-agent SDK telemetry (real per-case cost; eval framework v3+)
+            "pipeline_run_telemetry": ec.pipeline_run_telemetry or [],
         }
         for ec in eval_cases
     ]
@@ -345,6 +352,7 @@ def _run_unit_case(case_id: str, ground_truth: dict) -> EvalCase:
         ],
         pipeline_run_wall_seconds=[],
         pipeline_run_statuses=[],
+        pipeline_run_telemetry=[],
     )
 
 
@@ -360,16 +368,20 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
     submission_path = fixtures_dir / f"{case_id}.json"
     submission = json.loads(submission_path.read_text(encoding="utf-8"))
 
-    # Capture per-run wall time and status for the v3 business-value dims:
-    # pipeline_wall_time_p50_seconds and pipeline_completion_rate.
+    # Capture per-run wall time, status, AND per-agent SDK telemetry for the
+    # v3 business-value dims (pipeline_wall_time_p50_seconds,
+    # pipeline_completion_rate, estimated_cost_per_case_usd — the latter now
+    # uses real telemetry instead of a heuristic constant).
     pipeline_results = []
     run_wall_seconds: list[float] = []
     run_statuses: list[str] = []
+    run_telemetry: list[list[dict]] = []
     for _ in range(REPRODUCIBILITY_RUNS):
         _t0 = _time.perf_counter()
         pr = run_pipeline(submission)
         run_wall_seconds.append(_time.perf_counter() - _t0)
         run_statuses.append(pr.status)
+        run_telemetry.append(pr.agent_telemetry or [])
         pipeline_results.append(pr)
 
     overall_signals: list[str | None] = []
@@ -434,6 +446,7 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
         gates_fired=gates_fired,
         pipeline_run_wall_seconds=run_wall_seconds,
         pipeline_run_statuses=run_statuses,
+        pipeline_run_telemetry=run_telemetry,
     )
 
 
