@@ -134,7 +134,7 @@ done
 
 **Say:**
 
-> "Eval framework version 3. Nineteen active dimensions across 15 cases, grouped into three buckets — Value / Outcomes, Trust, and Operational Reliability. The framing matters: most AI eval work stops at model accuracy and hallucinations. This is closer to enterprise value instrumentation — the eval measures workflow correctness, governance adherence, AND business impact in the same artifact."
+> "Eval framework version 3. Eighteen active dimensions across 15 cases, grouped into three buckets — Value / Outcomes, Trust, and Operational Reliability. The framing matters: most AI eval work stops at model accuracy and hallucinations. This is closer to enterprise value instrumentation — the eval measures workflow correctness, governance adherence, AND business impact in the same artifact."
 
 **Walk through the buckets in the report (each has its own subsection):**
 
@@ -143,7 +143,7 @@ done
 - `false_escalation_rate` — *"How often the system sends cases to physicians that didn't need it. Workflow-compression value depends on this staying low."*
 - `pipeline_completion_rate` — *"Cases that survived all 5 gates end-to-end. Production-stability proxy."*
 
-**Bucket 2 — Trust (the RAI / governance core, 10 dims):**
+**Bucket 2 — Trust (the RAI / governance core, 9 dims):**
 - `ai_decision_limit = 1.00` across all 15 — *"AI never tried to emit a decision."*
 - `source_citation_accuracy = 1.00` — *"Every claim cites verifiable evidence."*
 - `citation_correctness = 1.00` — *"Cited the right NCCN passages, not just valid ones — closes Failure Mode #9."*

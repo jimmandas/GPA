@@ -2,7 +2,7 @@
 
 **Owner:** Jim
 **Last updated:** 2026-05-27
-**Eval framework version:** **v3** (RAI-aligned + business-value; 19 active dims; see `CHANGELOG.md`)
+**Eval framework version:** **v3** (RAI-aligned + business-value; 18 active dims after cohens_kappa removal 2026-05-28; see `CHANGELOG.md`)
 **Phase 2 build version:** in-development (Week 11-12)
 **Source-of-truth docs:** see "Canonical Docs" below
 
@@ -74,11 +74,11 @@ These do NOT move without explicit user approval (and a logged delta in `SCOPE_D
 
 ### Eval framework
 
-- **8 dimensions** (4 per-case + 4 aggregate; scope §7)
+- **18 dimensions** across 3 buckets (Value 4 / Trust 9 / Operational 5; v3, 2026-05-28)
 - **9 named failure modes** (scope §8)
-- **25-30 cases** (30% straightforward / 40% judgment-intensive / 30% adversarial)
-- **LLM-as-judge: different vendor** (GPT-4o for now, pinned snapshot)
-- **Cohen's κ ≥ 0.60** (Jim + Pax co-labels)
+- **15 cases** shipped (scope-cut from original 25-30; see SCOPE_DELTAS)
+- **LLM-as-judge: different vendor** (GPT-4o pinned snapshot `gpt-4o-2024-11-20`)
+- ~~**Cohen's κ ≥ 0.60** (Jim + Pax co-labels)~~ — **REMOVED 2026-05-28**, see SCOPE_DELTAS
 
 ---
 
@@ -118,14 +118,14 @@ The eval framework was bumped from v1 (8 scope §7 dims) to **v2 (12 active dims
 | rationale_faithfulness | Grounding + Explainability | ✅ (judge pinned to `gpt-4o-2024-11-20`) |
 | decision_reproducibility | Trustworthy | ✅ |
 
-**4 aggregate dims (scope §7, unchanged from v1):**
+**3 aggregate dims (scope §7; cohens_kappa removed 2026-05-28):**
 
 | Dimension | RAI category | Status |
 |---|---|---|
 | adversarial_gate_bypass_rate | Safety | ✅ |
 | false_escalation_rate | HITL + Operational | ✅ |
 | confidence_calibration | Trustworthy | ✅ |
-| cohens_kappa | Trustworthy | ⚠ N/A (no co-labels yet) |
+| ~~cohens_kappa~~ | ~~Trustworthy~~ | ❌ **REMOVED 2026-05-28** (meta-eval; ~10 person-hour cost, doesn't move OKR1/OKR2 — see SCOPE_DELTAS) |
 
 **Phase 2 §12 additions (wired into runner 2026-05-27):**
 

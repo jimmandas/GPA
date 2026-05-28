@@ -22,7 +22,6 @@ from eval.dimensions import (
     score_adversarial_gate_bypass_rate,
     score_false_escalation_rate,
     score_confidence_calibration,
-    score_cohens_kappa,
 )
 from eval.runner import run_eval, EvalCase
 
@@ -253,34 +252,10 @@ def test_confidence_calibration_perfect():
 
 
 # ---------------------------------------------------------------------------
-# 8. Cohen's κ
+# 8. Cohen's κ — REMOVED 2026-05-28 (see SCOPE_DELTAS.md). Meta-eval; would
+# require ~10 person-hours of dual labeling for one scalar that doesn't move
+# OKR1/OKR2. Re-add in Phase 3 if multi-rater production data exists.
 # ---------------------------------------------------------------------------
-
-def test_cohens_kappa_no_co_labels():
-    cases = [{"case_id": "c1", "ground_truth": {}}]
-    result = score_cohens_kappa(cases)
-    assert result.score is None
-
-
-def test_cohens_kappa_perfect_agreement():
-    cases = [
-        {"case_id": "c1", "ground_truth": {"co_labels": {"rater_a": "meets_criteria", "rater_b": "meets_criteria"}}},
-        {"case_id": "c2", "ground_truth": {"co_labels": {"rater_a": "ambiguous", "rater_b": "ambiguous"}}},
-    ]
-    result = score_cohens_kappa(cases)
-    assert result.score == 1.0
-    assert result.passed is True
-
-
-def test_cohens_kappa_disagreement():
-    cases = [
-        {"case_id": "c1", "ground_truth": {"co_labels": {"rater_a": "meets_criteria", "rater_b": "ambiguous"}}},
-        {"case_id": "c2", "ground_truth": {"co_labels": {"rater_a": "ambiguous", "rater_b": "meets_criteria"}}},
-        {"case_id": "c3", "ground_truth": {"co_labels": {"rater_a": "does_not_meet", "rater_b": "meets_criteria"}}},
-    ]
-    result = score_cohens_kappa(cases)
-    assert result.score is not None
-    assert result.score < 0.60  # 0 agreement → negative κ
 
 
 # ---------------------------------------------------------------------------
@@ -308,13 +283,13 @@ def test_run_eval_unit_mode():
         assert isinstance(case.dimension_scores, list)
         # Per-case has exactly 4 dims (2 computable in unit mode + 2 deferred)
         assert len(case.dimension_scores) == 4
-    # 15 aggregate dimensions after eval framework v3 + follow-ups (2026-05-28):
-    #   - 4 scope §7 originals
+    # 14 aggregate dimensions after eval framework v3 + cohens_kappa removal (2026-05-28):
+    #   - 3 scope §7 originals (cohens_kappa removed — see SCOPE_DELTAS)
     #   - 4 Phase 2 / scope additions
     #   - 4 Tier 1 business-value
     #   - 3 v3 follow-ups (pipeline_latency_p90_seconds, estimated_roi_per_case_usd,
     #     clinical_signal_accuracy)
-    assert len(aggregates) == 15
+    assert len(aggregates) == 14
 
 
 def test_run_eval_unit_mode_per_case_dim_names():
@@ -333,11 +308,10 @@ def test_run_eval_unit_mode_per_case_dim_names():
 def test_run_eval_unit_mode_aggregate_dim_names():
     _, aggregates = run_eval(live=False)
     expected = {
-        # Scope §7 original 4
+        # Scope §7 originals (cohens_kappa removed 2026-05-28; see SCOPE_DELTAS)
         "adversarial_gate_bypass_rate",
         "false_escalation_rate",
         "confidence_calibration",
-        "cohens_kappa",
         # Phase 2 §12 additions
         "physician_queue_routing_accuracy",
         "physician_rationale_compliance",

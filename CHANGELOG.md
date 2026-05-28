@@ -4,6 +4,36 @@ Material version bumps. Scope-level changes that affect what the system claims t
 
 ---
 
+## eval framework v3 — cohens_kappa removed (2026-05-28)
+
+**Headline:** Removed `cohens_kappa` from the active dim set. Net dim count
+19 → 18. Trust bucket 10 → 9. Meta-eval (measures ground-truth label
+reliability, not agent quality). Producing the signal requires ~10
+person-hours of independent dual labeling for a single scalar that doesn't
+move OKR1 (workflow compression) or OKR2 (governance proof). The 10
+person-hours are higher-leverage spent on dataset expansion (15 → 25-30
+cases), which strengthens every other dim simultaneously. Re-add in Phase 3
+if multi-rater production data exists. See `docs/SCOPE_DELTAS.md`.
+
+### What changed
+
+- `eval/dimensions.py`: `_cohens_kappa` + `score_cohens_kappa` deleted; section comment retained for audit trail
+- `eval/runner.py`: import + `aggregate_scores` entry removed
+- `tests/test_eval_harness.py`: 3 cohens tests removed, expected aggregate count 15 → 14, name set updated
+- `docs/SCOPE_BASELINE.md`: hard invariant removed; aggregate-dims table updated
+- `docs/eval-methodology.md`: dim count + table updated
+- `README.md`: dim count 19 → 18; table renumbered
+- `docs/EVAL_WRITEUP.md`: aggregate-dims table updated; honest-limits paragraph reflects scope removal
+- `docs/LOOM_SCRIPT.md`: Trust bucket count 10 → 9; total 19 → 18
+
+### Compatibility
+
+- ADR-009 (eval methodology) keeps original list as historical; add amendment pointing at SCOPE_DELTAS
+- Eval reports generated before 2026-05-28 retain cohens_kappa row as historical
+- v3 numbering otherwise unchanged
+
+---
+
 ## eval framework v3 — business-value dims (Tier 1 — 2026-05-28)
 
 **Headline:** Adds 4 operational/business-value dims to the 12 correctness dims. Closes the OKR1 measurement gap: v2 measured governance correctness thoroughly but had ZERO dims for operational outcomes (TAT, cost, stability, gate usage). v3 makes operationally-acceptable measurable.

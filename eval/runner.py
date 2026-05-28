@@ -8,7 +8,7 @@ Integration mode: runs full pipeline via live Claude SDK calls.
 Per scope §7, eval has two layers:
   - PER-CASE dimensions: source_citation, ai_decision_limit, faithfulness, reproducibility.
   - AGGREGATE dimensions: adversarial_gate_bypass_rate, false_escalation_rate,
-    confidence_calibration, cohens_kappa.
+    confidence_calibration. (cohens_kappa removed 2026-05-28 — see SCOPE_DELTAS.)
 
 Eval tiers (set via EVAL_TIER env var):
 
@@ -79,7 +79,6 @@ from eval.dimensions import (
     score_adversarial_gate_bypass_rate,
     score_false_escalation_rate,
     score_confidence_calibration,
-    score_cohens_kappa,
     score_physician_queue_routing_accuracy,
     score_physician_rationale_compliance,
     score_bias_disparity,
@@ -241,11 +240,10 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
         _phys_queue = None
 
     aggregate_scores = [
-        # Scope §7 original 4
+        # Scope §7 originals (cohens_kappa removed 2026-05-28; see SCOPE_DELTAS)
         score_adversarial_gate_bypass_rate(cases_for_aggregates),
         score_false_escalation_rate(cases_for_aggregates),
         score_confidence_calibration(cases_for_aggregates),
-        score_cohens_kappa(cases_for_aggregates),
         # Phase 2 §12 + scope-additions
         score_physician_queue_routing_accuracy(cases_for_aggregates, physician_queue=_phys_queue),
         score_physician_rationale_compliance(physician_queue=_phys_queue),

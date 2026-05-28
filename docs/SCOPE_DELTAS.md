@@ -16,6 +16,34 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
+### scope-removal: cohens_kappa removed from active eval dims — 2026-05-28
+
+- **Date logged:** 2026-05-28
+- **Decision:** Removed `cohens_kappa` from the active eval dimension set. Net dim count 19 → 18; Trust bucket 10 → 9.
+- **Why removed:**
+  - **It's a meta-eval**, not a system-quality eval. It measures whether two human raters labeled the same ground-truth cases the same way — i.e., whether the ground truth itself is reliably labeled. It does NOT measure agent quality, workflow correctness, governance, value, or operational properties.
+  - **It does not move outcomes.** Doesn't move OKR1 (workflow compression), doesn't move OKR2 (governance proof). At best it validates the foundation under `false_escalation_rate`, `citation_correctness`, `bias_disparity`, `clinical_signal_accuracy` — second-order.
+  - **Cost-benefit fails for this build.** Producing the signal requires ~10 person-hours minimum (Pax labels 15 cases independently, Jim labels the same 15, compute κ) for a single scalar. The same 10 person-hours spent on dataset expansion (15 → 25-30 cases) strengthen every other dim simultaneously — strictly higher leverage.
+  - **The PRD domain isn't subjective.** Prior auth on structured NCCN criteria has objectively-checkable ground truth. κ matters where labels are subjective (radiology read agreement, psychiatric coding) — not here.
+  - **Reporting κ as N/A with this reasoning is more credible than gaming a number.** A hiring manager who knows evals reads "removed because it would need 10 person-hours for one scalar without moving outcomes" and sees a PM who knows the difference between rigor and theater.
+- **Where κ would actually pay off (Phase 3 / future):**
+  - Real deployment with multiple nurse reviewers — κ across the *humans in the loop*
+  - A regulatory submission demanding evidence of ground-truth reliability
+  - A subjective domain
+  None of these are Phase 2 conditions. Re-add when one of them is true.
+- **Counterfactual:** Keeping κ in scope as "N/A pending co-labels" was the half-measure for several weeks. It cluttered every report, signaled an open commitment we weren't going to fund, and produced zero signal.
+- **What changed:**
+  - `eval/dimensions.py`: `_cohens_kappa` + `score_cohens_kappa` deleted; section comment retained for audit trail
+  - `eval/runner.py`: import + `aggregate_scores` entry removed
+  - `tests/test_eval_harness.py`: 3 cohens tests removed; expected aggregate count 15 → 14; expected name set updated
+  - `docs/SCOPE_BASELINE.md`: hard invariant struck through; "8 dimensions" line updated to 18 across 3 buckets; aggregate-dims table marks κ removed
+  - `docs/eval-methodology.md`: dim count 19 → 18; cohens row replaced with removal note
+  - `README.md`: count 19 → 18; table renumbered; v3-follow-up dims added as rows 16-18
+  - `docs/EVAL_WRITEUP.md`: aggregate-dims table updated; honest-limits paragraph reflects removal
+  - `docs/LOOM_SCRIPT.md`: Trust bucket count 10 → 9; total 19 → 18
+  - `CHANGELOG.md`: top-section entry
+- **Backout:** Trivial. `git revert <this commit>` restores everything. The scorer function is removed; co-labels in `ground_truth.jsonl` (currently zero) would need to be added before re-running.
+
 ### scope-addition: eval framework v3 — 3-bucket framing + ROI + signal accuracy + latency p90 — 2026-05-28
 
 - **Date logged:** 2026-05-28
@@ -28,9 +56,10 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
   - `estimated_cost_per_case_usd` (admin cost proxy, heuristic)
   - `estimated_roi_per_case_usd` (ROI heuristic — value saved minus cost, NEW 2026-05-28)
 
-  **Trust bucket (10) — "Can we rely on it safely?" — nests the 6 RAI categories**
-  - `source_citation_accuracy`, `ai_decision_limit`, `rationale_faithfulness`, `adversarial_gate_bypass_rate`, `confidence_calibration`, `cohens_kappa`, `physician_queue_routing_accuracy`, `physician_rationale_compliance`, `bias_disparity`, `citation_correctness`
+  **Trust bucket (9 after cohens_kappa removal later 2026-05-28) — "Can we rely on it safely?" — nests the 6 RAI categories**
+  - `source_citation_accuracy`, `ai_decision_limit`, `rationale_faithfulness`, `adversarial_gate_bypass_rate`, `confidence_calibration`, `physician_queue_routing_accuracy`, `physician_rationale_compliance`, `bias_disparity`, `citation_correctness`
   - `clinical_signal_accuracy` (signal-alignment with ground truth, NEW 2026-05-28; the closest dim to "clinical accuracy" within the PRD honest-limit constraint)
+  - **Amendment 2026-05-28:** `cohens_kappa` removed later same day — see preceding entry. Net Trust count is 9, not 10. Net total is 18, not 19.
 
   **Operational Reliability bucket (5) — "Can it reliably operate at scale?"**
   - `decision_reproducibility` (per-case)

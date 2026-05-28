@@ -13,12 +13,15 @@ Realigned to the scope doc (imaging-pa-poc-scope.md §7). Eight dimensions:
     5. Adversarial Gate-Bypass Rate    — score_adversarial_gate_bypass_rate
     6. False-Escalation Rate           — score_false_escalation_rate
     7. Confidence Calibration (ECE/Brier) — score_confidence_calibration
-    8. Cohen's κ (Nurse Agreement)     — score_cohens_kappa
 
 Removed (not in scope §7): schema_compliance, uncertainty_flag_coverage,
 overall_signal_match. (Schema compliance is still enforced inside each agent
 at runtime; uncertainty coverage and signal correctness are captured by
 False-Escalation Rate + Rationale Faithfulness aggregates.)
+
+Removed 2026-05-28: Cohen's κ (meta-eval; would require ~10 person-hours of
+independent dual labeling for a single scalar that doesn't move OKR1/OKR2.
+See SCOPE_DELTAS.md. Re-add in Phase 3 if multi-rater production data exists.)
 """
 
 from __future__ import annotations
@@ -509,88 +512,14 @@ def score_confidence_calibration(cases: list[dict]) -> DimensionScore:
 
 
 # ---------------------------------------------------------------------------
-# 8. Cohen's κ (AGGREGATE, requires co-labels)
+# 8. Cohen's κ — REMOVED 2026-05-28
 # ---------------------------------------------------------------------------
-
-def _cohens_kappa(rater_a: list[str], rater_b: list[str]) -> float:
-    """Standard Cohen's κ for two raters over categorical labels."""
-    if len(rater_a) != len(rater_b) or not rater_a:
-        return float("nan")
-    n = len(rater_a)
-    labels = sorted(set(rater_a) | set(rater_b))
-    # Observed agreement
-    agree = sum(1 for a, b in zip(rater_a, rater_b) if a == b) / n
-    # Expected agreement (chance)
-    expected = 0.0
-    for lab in labels:
-        pa = sum(1 for x in rater_a if x == lab) / n
-        pb = sum(1 for x in rater_b if x == lab) / n
-        expected += pa * pb
-    if expected == 1.0:
-        return 1.0 if agree == 1.0 else 0.0
-    return (agree - expected) / (1.0 - expected)
-
-
-def score_cohens_kappa(cases: list[dict]) -> DimensionScore:
-    """
-    Compute κ between rater A (e.g., Jim) and rater B (e.g., Pax) on cases
-    that have `co_labels` populated. Target: >=0.60 (v1), measured once.
-
-    Ground truth schema:
-      co_labels: { "rater_a": "meets_criteria", "rater_b": "ambiguous" }
-    """
-    rater_a: list[str] = []
-    rater_b: list[str] = []
-    labeled_case_ids: list[str] = []
-    for c in cases:
-        co = c["ground_truth"].get("co_labels")
-        if not isinstance(co, dict):
-            continue
-        a = co.get("rater_a")
-        b = co.get("rater_b")
-        if not (isinstance(a, str) and isinstance(b, str)):
-            continue
-        rater_a.append(a)
-        rater_b.append(b)
-        labeled_case_ids.append(c["case_id"])
-
-    if len(rater_a) < 2:
-        return DimensionScore(
-            dimension="cohens_kappa",
-            score=None,
-            target=">=0.60",
-            passed=None,
-            notes=(
-                f"Need >=2 co-labeled cases; have {len(rater_a)}. "
-                "Add `co_labels: {rater_a, rater_b}` to ground_truth records."
-            ),
-            is_aggregate=True,
-            bucket=BUCKET_TRUST,
-        )
-
-    kappa = _cohens_kappa(rater_a, rater_b)
-    if math.isnan(kappa):
-        return DimensionScore(
-            dimension="cohens_kappa",
-            score=None,
-            target=">=0.60",
-            passed=None,
-            notes="κ undefined (rater label arrays mismatched).",
-            is_aggregate=True,
-            bucket=BUCKET_TRUST,
-        )
-    return DimensionScore(
-        dimension="cohens_kappa",
-        score=kappa,
-        target=">=0.60",
-        passed=kappa >= 0.60,
-        notes=(
-            f"κ={kappa:.2f} over {len(rater_a)} co-labeled cases "
-            f"({labeled_case_ids})."
-        ),
-        is_aggregate=True,
-        bucket=BUCKET_TRUST,
-    )
+# Removed from active scope. Meta-eval (measures ground-truth label reliability,
+# not agent quality or any of the 3 buckets). Producing the signal would need
+# ~10 person-hours of independent dual labeling for one scalar that doesn't
+# move OKR1 (workflow compression) or OKR2 (governance proof). Re-add in
+# Phase 3 if multi-rater production data exists. See SCOPE_DELTAS.md
+# (entry: 2026-05-28).
 
 
 # ---------------------------------------------------------------------------
