@@ -9,7 +9,7 @@ This document captures the eval design per `imaging-pa-poc-scope.md §7-§8` plu
 ## The 18 active dimensions (v3)
 
 **Eval framework v3** (2026-05-28) groups dims into 3 buckets — **Value /
-Outcomes (4), Trust (9), Operational Reliability (5)**. The Trust bucket
+Outcomes (4), Trust (10), Operational Reliability (4)**. The Trust bucket
 covers all 6 RAI evaluation categories the strategy doc names as core
 constraints. See `CHANGELOG.md` for the v2→v3 changelog.
 

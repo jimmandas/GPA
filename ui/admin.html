@@ -194,6 +194,22 @@
     </p>
   </div>
 
+  <!-- Audit Log -->
+  <div class="panel">
+    <h2>Audit Log</h2>
+    <p class="desc">
+      Bilateral logger viewer over <code>decision_log/{case_id}.jsonl</code>.
+      <strong>Operator / compliance / engineering tool</strong> — not a
+      nurse-facing or hiring-manager-facing page. Lives here because:
+    </p>
+    <ul>
+      <li>In production it's a regulatory admissibility artifact (FDA-equivalent, state insurance commissioner, member appeals) — not a UI feature</li>
+      <li>Day-to-day users are compliance sampling reviewers and engineers debugging pipeline state</li>
+      <li>For the demo, the Pipeline Trace already shows the bilateral logger pre-write event (Card 9) — this page is for "show me the receipts" follow-up</li>
+    </ul>
+    <a href="audit.html" class="btn muted">Open Audit Log →</a>
+  </div>
+
   <!-- Quick Links -->
   <div class="panel">
     <h2>Quick Links</h2>
@@ -202,7 +218,6 @@
       <li><a href="pipeline_trace.html">Pipeline Trace</a> — visual demo asset</li>
       <li><a href="queue.html">Nurse Queue</a></li>
       <li><a href="physician_queue.html">Physician Queue</a></li>
-      <li><a href="audit.html">Audit Log</a> — bilateral logger viewer</li>
       <li><a href="eval_report_view.html">Latest Eval Report</a></li>
     </ul>
   </div>

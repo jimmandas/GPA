@@ -156,7 +156,6 @@
   </div>
   <div style="display:flex;gap:8px;">
     <a href="index.html" style="background:#6b7280;color:#fff;text-decoration:none;padding:8px 14px;border-radius:6px;font-size:0.82rem;font-weight:600;">← Dashboard</a>
-    <a href="pipeline_trace.html" style="background:#2563eb;color:#fff;text-decoration:none;padding:8px 14px;border-radius:6px;font-size:0.82rem;font-weight:600;">Pipeline Trace →</a>
     <a href="audit.html" style="background:#6b7280;color:#fff;text-decoration:none;padding:8px 14px;border-radius:6px;font-size:0.82rem;font-weight:600;">Audit Log →</a>
   </div>
 </header>
@@ -173,7 +172,6 @@
           <th>Indication</th>
           <th>Modality</th>
           <th>Status</th>
-          <th>Trace</th>
         </tr>
       </thead>
       <tbody id="case-table-body">
@@ -215,11 +213,11 @@
 
   async function loadQueue() {
     const tbody = document.getElementById("case-table-body");
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Loading…</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Loading…</td></tr>`;
     try {
       const res = await fetch(`${API_BASE}/api/v1/nurse/queue`);
       if (!res.ok) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">HTTP ${res.status}: ${res.statusText}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">HTTP ${res.status}: ${res.statusText}</td></tr>`;
         return;
       }
       const data = await res.json();
@@ -227,7 +225,7 @@
       cases.sort((a, b) => new Date(a.submitted_at || 0) - new Date(b.submitted_at || 0));
 
       if (cases.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No cases in queue.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No cases in queue.</td></tr>`;
         return;
       }
 
@@ -238,7 +236,6 @@
           ? `onclick="window.location.href='nurse_workspace.html?case_id=${encodeURIComponent(c.case_id)}'"` : "";
         const arrow = isClickable ? `<span class="arrow-icon">→</span>` : "";
 
-        const traceHref = `pipeline_trace.html?case_id=${encodeURIComponent(c.case_id)}`;
         return `
           <tr class="${rowClass}" ${onClick}>
             <td><span class="case-id">${escapeHtml(c.case_id)}</span>${arrow}</td>
@@ -247,12 +244,11 @@
             <td>${escapeHtml(formatIndication(c.indication_category))}</td>
             <td>${escapeHtml(c.modality || "—")} · ${escapeHtml(c.body_region || "—")}</td>
             <td><span class="badge badge-${escapeHtml(c.status)}">${escapeHtml(String(c.status).replace(/_/g, " "))}</span></td>
-            <td><a href="${traceHref}" onclick="event.stopPropagation();" style="color:#2563eb;font-size:0.8rem;font-weight:600;text-decoration:none;">View →</a></td>
           </tr>
         `;
       }).join("");
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Network error: ${escapeHtml(String(err))}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Network error: ${escapeHtml(String(err))}</td></tr>`;
     }
   }
 

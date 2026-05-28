@@ -67,6 +67,11 @@ class DimensionScore:
     notes: str
     is_aggregate: bool = False  # True for suite-wide dims, False for per-case
     bucket: str = BUCKET_TRUST  # one of BUCKET_VALUE / BUCKET_TRUST / BUCKET_OPERATIONAL
+    # Optional structured breakdown for dims with sub-components (e.g. cost has
+    # reasoning / retrieval / judge sub-buckets). Rendered as sub-rows by the
+    # dashboard and as a labeled sub-line in the markdown report. None for dims
+    # that are a single scalar (most dims).
+    breakdown: dict | None = None
 
     def __post_init__(self) -> None:
         if self.bucket not in _VALID_BUCKETS:
@@ -1123,12 +1128,31 @@ def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
     judge_in     = _TOKENS_PER_JUDGE_CALL_INPUT
     judge_out    = _TOKENS_PER_JUDGE_CALL_OUTPUT
 
-    cost_per_case = (
+    # Sub-bucket the cost so the Value card / ROI explanation is transparent:
+    #   reasoning  — 4 agents × 5 reps × Claude tokens. The bulk.
+    #   retrieval  — tool calls (patient_history_lookup, prior_imaging_lookup,
+    #                nccn_passage_lookup). FIXTURE-MOCKED today, so $0. In
+    #                production this becomes pgvector / EHR API cost
+    #                (~$0.001–$0.01/case). We expose the bucket NOW so the
+    #                framework is honest about what's missing.
+    #   judge      — 1 GPT-4o call per case for rationale_faithfulness.
+    #                EVAL-ONLY — does NOT show up in production cost.
+    reasoning_cost = (
         (in_per_case  * agent_rates["input"])  / 1_000_000 +
-        (out_per_case * agent_rates["output"]) / 1_000_000 +
-        (judge_in     * judge_rates["input"])  / 1_000_000 +
-        (judge_out    * judge_rates["output"]) / 1_000_000
+        (out_per_case * agent_rates["output"]) / 1_000_000
     )
+    retrieval_cost = 0.0  # mocked; placeholder for production telemetry
+    judge_cost = (
+        (judge_in  * judge_rates["input"])  / 1_000_000 +
+        (judge_out * judge_rates["output"]) / 1_000_000
+    )
+    cost_per_case = reasoning_cost + retrieval_cost + judge_cost
+
+    breakdown = {
+        "reasoning_usd":         round(reasoning_cost, 4),
+        "retrieval_usd":         round(retrieval_cost, 4),
+        "judge_eval_only_usd":   round(judge_cost, 4),
+    }
 
     return DimensionScore(
         dimension=dim,
@@ -1136,12 +1160,15 @@ def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
         target=target,
         passed=cost_per_case < 2.00,
         notes=(
-            f"~${cost_per_case:.3f}/case using model={agent_model} "
-            f"(5 reps × 4 agents @ ~3.6k tokens each + 1 judge call). "
-            "Heuristic estimate; real telemetry is Phase 3."
+            f"~${cost_per_case:.3f}/case using model={agent_model}. "
+            f"Reasoning ${reasoning_cost:.3f} (4 agents × 5 reps) + "
+            f"Retrieval ${retrieval_cost:.3f} (tool fixtures mocked; prod ~$0.001/case) + "
+            f"Judge ${judge_cost:.3f} (eval-only GPT-4o). "
+            "Heuristic; real telemetry is Phase 3."
         ),
         is_aggregate=True,
         bucket=BUCKET_VALUE,
+        breakdown=breakdown,
     )
 
 
@@ -1373,6 +1400,119 @@ def score_gate_fire_distribution(cases: list[dict]) -> DimensionScore:
         notes=f"{distinct} distinct gates fired. Distribution: {breakdown}",
         is_aggregate=True,
         bucket=BUCKET_OPERATIONAL,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Suite-wide roll-ups for the 4 per-case dims (eval framework v3 — 2026-05-28)
+# ---------------------------------------------------------------------------
+# The 4 per-case dims (source_citation, ai_decision_limit, faithfulness,
+# reproducibility) live in the per-case tables of the report. Without a
+# suite-wide roll-up, they don't appear in the bucket cards on the dashboard
+# — creating a gap between "18 dims claimed" and "14 dims rendered".
+#
+# These 4 roll-ups close that gap. Each takes the suite of cases (which
+# already carry their per-case dim scores in `per_case_dim_scores`) and
+# returns a single aggregate score = mean across all cases with a non-None
+# score. Pass/fail uses the canonical v2 target from per-case scoring.
+
+def _suite_avg_of_per_case_dim(
+    cases: list[dict],
+    dim_name: str,
+    output_name: str,
+    target_str: str,
+    pass_threshold: float,
+    bucket: str,
+    note_prefix: str,
+) -> DimensionScore:
+    """Roll up a per-case dim's per-case scores into one mean score."""
+    values: list[float] = []
+    for c in cases:
+        s = (c.get("per_case_dim_scores") or {}).get(dim_name)
+        if isinstance(s, (int, float)):
+            values.append(float(s))
+    if not values:
+        return DimensionScore(
+            dimension=output_name,
+            score=None,
+            target=target_str,
+            passed=None,
+            notes=f"No per-case {dim_name} scores available.",
+            is_aggregate=True,
+            bucket=bucket,
+        )
+    avg = sum(values) / len(values)
+    return DimensionScore(
+        dimension=output_name,
+        score=avg,
+        target=target_str,
+        passed=avg >= pass_threshold,
+        notes=f"{note_prefix} mean={avg:.3f} over {len(values)} cases.",
+        is_aggregate=True,
+        bucket=bucket,
+    )
+
+
+def score_source_citation_accuracy_suite_avg(cases: list[dict]) -> DimensionScore:
+    """Mean source_citation_accuracy across all cases (Trust roll-up)."""
+    return _suite_avg_of_per_case_dim(
+        cases,
+        dim_name="source_citation_accuracy",
+        output_name="source_citation_accuracy_suite_avg",
+        target_str=">=0.95",
+        pass_threshold=0.95,
+        bucket=BUCKET_TRUST,
+        note_prefix="Source-citation",
+    )
+
+
+def score_ai_decision_limit_suite_avg(cases: list[dict]) -> DimensionScore:
+    """Mean ai_decision_limit across all cases — effectively pass-rate (Trust roll-up).
+
+    Score=1.0 means NO case had an agent that tried to emit a decision; the
+    architectural guarantee held across the entire suite.
+    """
+    return _suite_avg_of_per_case_dim(
+        cases,
+        dim_name="ai_decision_limit",
+        output_name="ai_decision_limit_suite_avg",
+        target_str="==1.00",
+        pass_threshold=1.0,
+        bucket=BUCKET_TRUST,
+        note_prefix="AI-decision-limit",
+    )
+
+
+def score_rationale_faithfulness_suite_avg(cases: list[dict]) -> DimensionScore:
+    """Mean rationale_faithfulness across cases with judge scores (Trust roll-up).
+
+    Excludes cases where the judge returned N/A (missing OpenAI key, etc.).
+    """
+    return _suite_avg_of_per_case_dim(
+        cases,
+        dim_name="rationale_faithfulness",
+        output_name="rationale_faithfulness_suite_avg",
+        target_str=">=0.80",
+        pass_threshold=0.80,
+        bucket=BUCKET_TRUST,
+        note_prefix="Rationale-faithfulness",
+    )
+
+
+def score_decision_reproducibility_suite_avg(cases: list[dict]) -> DimensionScore:
+    """Mean decision_reproducibility across cases (Operational roll-up).
+
+    Per-case score = modal_count / 5. Suite mean tracks how often the
+    pipeline produced identical outputs across 5 reps.
+    """
+    return _suite_avg_of_per_case_dim(
+        cases,
+        dim_name="decision_reproducibility",
+        output_name="decision_reproducibility_suite_avg",
+        target_str=">=0.80",
+        pass_threshold=0.80,
+        bucket=BUCKET_OPERATIONAL,
+        note_prefix="Decision-reproducibility",
     )
 
 

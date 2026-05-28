@@ -17,7 +17,7 @@ baseline + delta log.
 
 Strategy §6 names Responsible AI as a **core system constraint, not a downstream
 review phase**. The eval framework v3 operationalizes this with 18 active dims
-across 3 buckets — **Value / Outcomes (4), Trust (9), Operational Reliability (5)**.
+across 3 buckets — **Value / Outcomes (4), Trust (10), Operational Reliability (4)**.
 The Trust bucket covers all six RAI evaluation categories (safety, grounding,
 policy compliance, HITL, explainability, fairness). The Value and Operational
 buckets close the OKR1 measurement gap (ROI heuristic, latency p50/p90, cost,

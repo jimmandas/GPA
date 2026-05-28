@@ -283,13 +283,15 @@ def test_run_eval_unit_mode():
         assert isinstance(case.dimension_scores, list)
         # Per-case has exactly 4 dims (2 computable in unit mode + 2 deferred)
         assert len(case.dimension_scores) == 4
-    # 14 aggregate dimensions after eval framework v3 + cohens_kappa removal (2026-05-28):
+    # 18 aggregate dimensions after eval framework v3 + cohens removal + per-case
+    # roll-ups (Fix B — 2026-05-28). Roll-ups close the dashboard 18-vs-14 gap:
     #   - 3 scope §7 originals (cohens_kappa removed — see SCOPE_DELTAS)
     #   - 4 Phase 2 / scope additions
     #   - 4 Tier 1 business-value
     #   - 3 v3 follow-ups (pipeline_latency_p90_seconds, estimated_roi_per_case_usd,
     #     clinical_signal_accuracy)
-    assert len(aggregates) == 14
+    #   - 4 per-case dim suite-wide roll-ups (Fix B)
+    assert len(aggregates) == 18
 
 
 def test_run_eval_unit_mode_per_case_dim_names():
@@ -327,6 +329,11 @@ def test_run_eval_unit_mode_aggregate_dim_names():
         "pipeline_latency_p90_seconds",    # tail-latency / variance
         "estimated_roi_per_case_usd",      # ROI heuristic (Value)
         "clinical_signal_accuracy",        # signal-alignment with ground truth (Trust)
+        # Per-case dim suite-wide roll-ups (Fix B — 2026-05-28; close dashboard gap)
+        "source_citation_accuracy_suite_avg",        # Trust
+        "ai_decision_limit_suite_avg",               # Trust
+        "rationale_faithfulness_suite_avg",          # Trust
+        "decision_reproducibility_suite_avg",        # Operational
     }
     actual = {ds.dimension for ds in aggregates}
     assert actual == expected

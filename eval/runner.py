@@ -92,6 +92,12 @@ from eval.dimensions import (
     score_pipeline_latency_p90_seconds,
     score_estimated_roi_per_case_usd,
     score_clinical_signal_accuracy,
+    # Suite-wide roll-ups of per-case dims so bucket cards show all 18 dims
+    # (Fix B — 2026-05-28; closes the per-case-vs-bucket-view gap)
+    score_source_citation_accuracy_suite_avg,
+    score_ai_decision_limit_suite_avg,
+    score_rationale_faithfulness_suite_avg,
+    score_decision_reproducibility_suite_avg,
 )
 
 
@@ -258,6 +264,11 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
         score_pipeline_latency_p90_seconds(cases_for_aggregates),
         score_estimated_roi_per_case_usd(cases_for_aggregates),
         score_clinical_signal_accuracy(cases_for_aggregates),
+        # Per-case dim roll-ups (Fix B — close 18-vs-14 dashboard gap)
+        score_source_citation_accuracy_suite_avg(cases_for_aggregates),
+        score_ai_decision_limit_suite_avg(cases_for_aggregates),
+        score_rationale_faithfulness_suite_avg(cases_for_aggregates),
+        score_decision_reproducibility_suite_avg(cases_for_aggregates),
     ]
     return eval_cases, aggregate_scores
 
@@ -457,16 +468,20 @@ def print_report(
     # Per-case section
     print("## Per-Case Results")
     print()
+    # Bucket label shorthand for the per-case table (so each per-case dim row
+    # carries its bucket — completes Fix B / closes the dashboard-vs-report gap).
+    _BUCKET_SHORT = {"value": "Value", "trust": "Trust", "operational": "Operational"}
     for ec in eval_cases:
         label = ec.ground_truth.get("label", "")
         status = "PASS" if ec.overall_pass else "FAIL"
         print(f"### {ec.case_id} ({label}) — {status}")
         print()
-        print("| Dimension | Score | Target | Status | Notes |")
-        print("|---|---|---|---|---|")
+        print("| Dimension | Bucket | Score | Target | Status | Notes |")
+        print("|---|---|---|---|---|---|")
         for ds in ec.dimension_scores:
             score_str = "N/A" if ds.score is None else f"{ds.score:.2f}"
             status_str = "—" if ds.passed is None else ("✓" if ds.passed else "✗")
+            bucket_str = _BUCKET_SHORT.get(ds.bucket, ds.bucket)
             # Notes are how we surface WHY a dim is N/A or what the failure looks like.
             # Without this, an N/A score has no actionable detail — a real diagnostic gap
             # exposed by the 2026-05-27 eval where 12/15 cases had `rationale_faithfulness=N/A`
@@ -474,7 +489,7 @@ def print_report(
             notes = (ds.notes or "").replace("|", "\\|").replace("\n", " ")[:120]
             if notes and len(ds.notes or "") > 120:
                 notes += "…"
-            print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} | {notes} |")
+            print(f"| {ds.dimension} | {bucket_str} | {score_str} | {ds.target} | {status_str} | {notes} |")
         print()
 
     # Aggregate section — grouped by bucket (eval framework v3)
@@ -514,6 +529,12 @@ def print_report(
             if len(notes_short) > 90:
                 notes_short = notes_short[:87] + "..."
             print(f"| {ds.dimension} | {score_str} | {ds.target} | {status_str} | {notes_short} |")
+            # Structured sub-bucket breakdown for dims with composite components
+            # (e.g. cost = reasoning + retrieval + judge). Emitted as a fenced
+            # JSON line that the dashboard API parses back out.
+            if ds.breakdown:
+                import json as _json
+                print(f"`breakdown:{ds.dimension}` {_json.dumps(ds.breakdown)}")
         print()
 
     if not live:

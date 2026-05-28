@@ -179,6 +179,9 @@
       color: #6b7280;
       text-transform: uppercase;
       letter-spacing: 0.06em;
+      line-height: 1.3;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
 
     .eval-headline .dim-value {
@@ -191,6 +194,32 @@
     .eval-headline.pass .dim-value { color: #15803d; }
     .eval-headline.fail .dim-value { color: #b91c1c; }
     .eval-headline.na   .dim-value { color: #9ca3af; }
+
+    .breakdown {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px dashed #e2e5ea;
+      display: grid;
+      gap: 2px;
+    }
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.68rem;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+    .breakdown-row .label {
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 500;
+    }
+    .breakdown-row .val {
+      font-family: "SF Mono", "Fira Mono", monospace;
+      color: #374151;
+      font-weight: 600;
+    }
+    .breakdown-row.zero .val { color: #9ca3af; }
 
     .reviewer-card {
       background: #fafbfc;
@@ -257,16 +286,14 @@
   <!-- HERO: Pipeline Trace -->
   <div class="row">
     <div class="card hero">
-      <h2>Pipeline Trace <span class="badge-hero">START HERE</span></h2>
+      <h2>Pipeline Trace</h2>
       <p class="desc">
         Watch the architecture run live on a real case: 5 hard control gates,
         4 agents, bilateral logger, every stage's input and output. About 30
         seconds of real compute, 10 cards of evidence.
       </p>
       <div class="actions">
-        <a href="pipeline_trace.html?case_id=case_0001" class="btn primary">Trace case_0001 (clean) →</a>
-        <a href="pipeline_trace.html?case_id=case_0006" class="btn primary">Trace case_0006 (adversarial) →</a>
-        <a href="pipeline_trace.html" class="btn secondary">Pick a case →</a>
+        <a href="pipeline_trace.html" class="btn primary">Pick a case →</a>
       </div>
     </div>
   </div>
@@ -307,9 +334,9 @@
   <!-- Eval Report — v3, bucket-grouped -->
   <div class="row">
     <div class="card">
-      <h2>Eval Report (v3 — 16 dims, 3-bucket framing)</h2>
+      <h2>Eval Report (v3 — 18 dims, 3-bucket framing)</h2>
       <p class="desc">
-        Sixteen dimensions across three stakeholder buckets:
+        Eighteen dimensions across three stakeholder buckets:
         <strong>Value</strong> — "Did it matter?" ·
         <strong>Trust</strong> — "Can we rely on it safely?" (nests the 6 RAI categories) ·
         <strong>Operational Reliability</strong> — "Can it reliably operate at scale?"
@@ -320,7 +347,6 @@
       </div>
       <div class="actions">
         <a id="full-report-link" href="#" class="btn primary" target="_blank">View full report ↗</a>
-        <a href="audit.html" class="btn secondary">Audit log →</a>
       </div>
     </div>
   </div>
@@ -346,8 +372,7 @@
 </main>
 
 <footer>
-  GPA v4 · Phase 2 MVP · API on :8000 · UI on :8001 ·
-  <a href="audit.html">Audit log</a>
+  GPA v4 · Phase 2 MVP · API on :8000 · UI on :8001
 </footer>
 
 <script>
@@ -368,15 +393,6 @@
       span.className = `pill ${cls}`;
       span.textContent = text;
       row.appendChild(span);
-    }
-
-    // API health
-    try {
-      const r = await fetch(`${API_BASE}/api/v1/health`);
-      if (r.ok) pill("API healthy ✓", "ok");
-      else pill(`API unreachable (${r.status})`, "warn");
-    } catch (err) {
-      pill("API unreachable", "warn");
     }
 
     // Nurse queue
@@ -408,7 +424,7 @@
     } catch (err) {}
 
     // Eval framework version
-    pill("Eval v2 (12 dims, RAI-aligned)", "info");
+    pill("Eval v3 (18 dims, 3-bucket framing)", "info");
   }
 
   async function loadEvalSummary() {
@@ -449,12 +465,34 @@
         const passing = dims.filter(x => statusClass(x.status) === "pass").length;
         const failing = dims.filter(x => statusClass(x.status) === "fail").length;
         const naCount = dims.filter(x => statusClass(x.status) === "na").length;
-        const dimCards = dims.map(dim => `
-          <div class="eval-headline ${statusClass(dim.status)}">
-            <div class="dim-name">${esc(dim.dimension)}</div>
-            <div class="dim-value">${esc(dim.score)}</div>
-          </div>
-        `).join("");
+        const dimCards = dims.map(dim => {
+          let breakdownHtml = "";
+          if (dim.breakdown && typeof dim.breakdown === "object") {
+            const rows = Object.entries(dim.breakdown).map(([k, v]) => {
+              const label = String(k)
+                .replace(/_usd$/, "")
+                .replace(/_/g, " ")
+                .replace(/\beval only\b/, "(eval-only)");
+              const isZero = typeof v === "number" && v === 0;
+              const valStr = typeof v === "number" ? `$${v.toFixed(3)}` : esc(String(v));
+              const note = isZero ? " <span style=\"font-style:italic;\">mocked</span>" : "";
+              return `
+                <div class="breakdown-row${isZero ? " zero" : ""}">
+                  <span class="label">${esc(label)}${note}</span>
+                  <span class="val">${valStr}</span>
+                </div>
+              `;
+            }).join("");
+            breakdownHtml = `<div class="breakdown">${rows}</div>`;
+          }
+          return `
+            <div class="eval-headline ${statusClass(dim.status)}">
+              <div class="dim-name">${esc(dim.dimension)}</div>
+              <div class="dim-value">${esc(dim.score)}</div>
+              ${breakdownHtml}
+            </div>
+          `;
+        }).join("");
         return `
           <div style="margin-top:14px;">
             <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">

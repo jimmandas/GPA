@@ -74,7 +74,7 @@ These do NOT move without explicit user approval (and a logged delta in `SCOPE_D
 
 ### Eval framework
 
-- **18 dimensions** across 3 buckets (Value 4 / Trust 9 / Operational 5; v3, 2026-05-28)
+- **18 dimensions** across 3 buckets (Value 4 / Trust 10 / Operational 4; v3, 2026-05-28)
 - **9 named failure modes** (scope §8)
 - **15 cases** shipped (scope-cut from original 25-30; see SCOPE_DELTAS)
 - **LLM-as-judge: different vendor** (GPT-4o pinned snapshot `gpt-4o-2024-11-20`)

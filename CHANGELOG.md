@@ -7,7 +7,9 @@ Material version bumps. Scope-level changes that affect what the system claims t
 ## eval framework v3 — cohens_kappa removed (2026-05-28)
 
 **Headline:** Removed `cohens_kappa` from the active dim set. Net dim count
-19 → 18. Trust bucket 10 → 9. Meta-eval (measures ground-truth label
+19 → 18. Trust bucket 11 → 10 (earlier wording "10 → 9" was an off-by-one
+that was corrected 2026-05-28 alongside Fix B; cohens was in Trust pre-removal,
+giving Trust=11 → 10). Meta-eval (measures ground-truth label
 reliability, not agent quality). Producing the signal requires ~10
 person-hours of independent dual labeling for a single scalar that doesn't
 move OKR1 (workflow compression) or OKR2 (governance proof). The 10

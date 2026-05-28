@@ -197,6 +197,11 @@ def _parse_eval_report(md_path: pathlib.Path) -> dict[str, Any]:
         "trust":                    "trust",
         "operational reliability":  "operational",
     }
+    # Dims removed from active scope post-report-generation. Reports written
+    # before the removal date still contain these rows; we filter them out
+    # at the API layer so the dashboard stays in sync with current scope.
+    # See docs/SCOPE_DELTAS.md.
+    _REMOVED_DIMS = {"cohens_kappa"}
     for line in text.splitlines():
         if "## Aggregate" in line:
             in_aggregate_section = True
@@ -214,6 +219,9 @@ def _parse_eval_report(md_path: pathlib.Path) -> dict[str, Any]:
                 continue
             parts = [p.strip() for p in line.strip("|").split("|")]
             if len(parts) >= 5:
+                dim_name = parts[0].strip("`")
+                if dim_name in _REMOVED_DIMS:
+                    continue
                 aggregate_dims.append({
                     "dimension": parts[0],
                     "score": parts[1],
@@ -221,7 +229,26 @@ def _parse_eval_report(md_path: pathlib.Path) -> dict[str, Any]:
                     "status": parts[3],
                     "notes": parts[4][:200],
                     "bucket": current_bucket,
+                    "breakdown": None,
                 })
+        # Structured breakdown line: `breakdown:<dim_name>` {json}
+        # Emitted by runner.print_report immediately after the row for any dim
+        # with a composite cost structure. We attach it to the previous dim entry.
+        elif line.startswith("`breakdown:"):
+            import json as _json
+            try:
+                close = line.index("`", 1)
+                breakdown_key = line[1:close]  # "breakdown:<dim_name>"
+                target_dim = breakdown_key.split(":", 1)[1]
+                breakdown_json = line[close + 1:].strip()
+                breakdown_data = _json.loads(breakdown_json)
+                for entry in reversed(aggregate_dims):
+                    if entry["dimension"].strip("`") == target_dim:
+                        entry["breakdown"] = breakdown_data
+                        break
+            except (ValueError, _json.JSONDecodeError):
+                # Malformed breakdown line — skip silently; not pass/fail critical
+                pass
 
     return {
         "filename": md_path.name,

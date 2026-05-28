@@ -16,10 +16,28 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
+### scope-clarification: per-case dims rolled up into bucket view (Fix B) — 2026-05-28
+
+- **Date logged:** 2026-05-28
+- **Issue surfaced:** The dashboard advertised "18 dims across 3 buckets" but the bucket cards only rendered 14 — the 4 per-case dims (source_citation_accuracy, ai_decision_limit, rationale_faithfulness, decision_reproducibility) lived in the per-case tables and never appeared in the aggregate bucket view. Felt inconsistent on inspection.
+- **Decision:** Added 4 suite-wide roll-ups (`<dim>_suite_avg`) that compute the mean per-case score across all cases. They flow into `aggregate_scores` and render as tiles in the appropriate bucket card. The original per-case dims remain — the roll-ups are a *view*, not a replacement.
+- **Bucket totals (correct after Fix B):**
+  - Value / Outcomes: **4** (unchanged)
+  - Trust: **10** — 7 aggregate + 3 per-case roll-ups
+  - Operational Reliability: **4** — 3 aggregate + 1 per-case roll-up
+  - Total: **18**
+- **Also corrected:** the "Trust 9 / Operational 5" counts written in the cohens-removal entry (and downstream docs) were off-by-one. Pre-cohens Trust was 11 (not 10); post-removal Trust = 10 (not 9). Pre-cohens Operational was 4 (not 5); post-removal Operational = 4. Fix B addresses both the structural gap and the count error.
+- **What changed:**
+  - `eval/dimensions.py`: 4 new scorers + 1 helper (`_suite_avg_of_per_case_dim`)
+  - `eval/runner.py`: imports + aggregate_scores entries; per-case table gets a Bucket column
+  - `tests/test_eval_harness.py`: aggregate count 14 → 18; expected name set expanded
+  - `README.md`, `docs/SCOPE_BASELINE.md`, `docs/EVAL_WRITEUP.md`, `docs/LOOM_SCRIPT.md`, `docs/eval-methodology.md`, `CHANGELOG.md`: bucket subcounts corrected
+- **Backout:** Trivial. Remove the 4 roll-up scorers from `aggregate_scores` and the Bucket column from print_report. The roll-up scorers don't replace per-case data.
+
 ### scope-removal: cohens_kappa removed from active eval dims — 2026-05-28
 
 - **Date logged:** 2026-05-28
-- **Decision:** Removed `cohens_kappa` from the active eval dimension set. Net dim count 19 → 18; Trust bucket 10 → 9.
+- **Decision:** Removed `cohens_kappa` from the active eval dimension set. Net dim count 19 → 18; Trust bucket 11 → 10 (the earlier "10 → 9" written here was an off-by-one — corrected 2026-05-28).
 - **Why removed:**
   - **It's a meta-eval**, not a system-quality eval. It measures whether two human raters labeled the same ground-truth cases the same way — i.e., whether the ground truth itself is reliably labeled. It does NOT measure agent quality, workflow correctness, governance, value, or operational properties.
   - **It does not move outcomes.** Doesn't move OKR1 (workflow compression), doesn't move OKR2 (governance proof). At best it validates the foundation under `false_escalation_rate`, `citation_correctness`, `bias_disparity`, `clinical_signal_accuracy` — second-order.
@@ -56,12 +74,12 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
   - `estimated_cost_per_case_usd` (admin cost proxy, heuristic)
   - `estimated_roi_per_case_usd` (ROI heuristic — value saved minus cost, NEW 2026-05-28)
 
-  **Trust bucket (9 after cohens_kappa removal later 2026-05-28) — "Can we rely on it safely?" — nests the 6 RAI categories**
+  **Trust bucket (10 after cohens_kappa removal later 2026-05-28; earlier "9" was an off-by-one corrected with Fix B) — "Can we rely on it safely?" — nests the 6 RAI categories**
   - `source_citation_accuracy`, `ai_decision_limit`, `rationale_faithfulness`, `adversarial_gate_bypass_rate`, `confidence_calibration`, `physician_queue_routing_accuracy`, `physician_rationale_compliance`, `bias_disparity`, `citation_correctness`
   - `clinical_signal_accuracy` (signal-alignment with ground truth, NEW 2026-05-28; the closest dim to "clinical accuracy" within the PRD honest-limit constraint)
   - **Amendment 2026-05-28:** `cohens_kappa` removed later same day — see preceding entry. Net Trust count is 9, not 10. Net total is 18, not 19.
 
-  **Operational Reliability bucket (5) — "Can it reliably operate at scale?"**
+  **Operational Reliability bucket (4; earlier "5" was an off-by-one corrected with Fix B) — "Can it reliably operate at scale?"**
   - `decision_reproducibility` (per-case)
   - `pipeline_completion_rate`, `gate_fire_distribution`
   - `pipeline_latency_p90_seconds` (tail-latency variance, NEW 2026-05-28)

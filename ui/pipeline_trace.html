@@ -215,13 +215,42 @@
     .pill-na   { background: #f3f4f6; color: #6b7280; }
 
     .empty {
-      padding: 48px 16px;
-      text-align: center;
-      color: #9ca3af;
+      padding: 28px 32px;
+      color: #374151;
       font-size: 0.9rem;
+      line-height: 1.6;
       background: #fff;
-      border: 1px dashed #e2e5ea;
+      border: 1px solid #e2e5ea;
       border-radius: 8px;
+    }
+
+    .empty h3 {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      margin-bottom: 10px;
+    }
+
+    .empty p {
+      margin-bottom: 12px;
+    }
+
+    .empty ul {
+      margin: 6px 0 12px 22px;
+      color: #374151;
+      font-size: 0.88rem;
+    }
+
+    .empty ul li {
+      margin-bottom: 4px;
+    }
+
+    .empty .cta {
+      color: #2563eb;
+      font-weight: 600;
+      margin-top: 4px;
     }
 
     .running {
@@ -255,7 +284,7 @@
 <header>
   <div>
     <h1>GPA v4 · Pipeline Trace</h1>
-    <p>Submit a case, watch the agents and gates fire end-to-end.</p>
+    <p>Architecture lens for the demo — not a nurse-facing tool.</p>
   </div>
   <div class="nav-buttons">
     <a class="secondary" href="index.html">← Dashboard</a>
@@ -281,7 +310,29 @@
 
   <div id="trace-container">
     <div class="empty">
-      Select a case fixture and click <strong>Submit + Run Pipeline</strong> to see the case journey.
+      <h3>What this page is for</h3>
+      <p>
+        This view exists for the <strong>demo recording and technical reviewers</strong>.
+        It is <strong>not</strong> a nurse workflow tool — nurses work from the
+        <a href="queue.html" style="color:#2563eb;text-decoration:none;font-weight:600;">Nurse Queue</a>
+        and never see this page in production.
+      </p>
+      <p>
+        The purpose is to make the governance architecture <em>visible</em>: run
+        the full pipeline on one fixture case and show every stage's input and
+        output. A hiring manager or auditor can watch the system actually execute
+        instead of reading a diagram.
+      </p>
+
+      <h3>What you'll see</h3>
+      <ul>
+        <li>4 agents: Evidence Summarizer, Context Retriever, Policy Mapper, Reasoning Drafter</li>
+        <li>5 hard control gates: Admission, Confidence, Source Verification, AI-Decision-Limit, Bilateral Logger pre-write</li>
+        <li>10 sequential cards — agent I/O + gate pass/fail + audit-log write — for one real run</li>
+        <li>~20–60 seconds of live compute per run (temperature=0, pinned model snapshot)</li>
+      </ul>
+
+      <p class="cta">→ Pick a case fixture above and click <strong>Submit + Run Pipeline</strong>.</p>
     </div>
   </div>
 </main>
