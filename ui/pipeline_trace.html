@@ -479,7 +479,25 @@
   }
 
   document.getElementById("run-btn").addEventListener("click", runPipeline);
-  loadCaseList();
+
+  // Auto-select + auto-run if a ?case_id= param is provided in the URL.
+  // Used by queue.html row clicks: pipeline_trace.html?case_id=case_0001
+  async function init() {
+    await loadCaseList();
+    const params = new URLSearchParams(window.location.search);
+    const presetCase = params.get("case_id");
+    if (presetCase) {
+      const select = document.getElementById("case-picker");
+      // Wait for options to be populated
+      const opt = Array.from(select.options).find(o => o.value === presetCase);
+      if (opt) {
+        select.value = presetCase;
+        runPipeline();
+      }
+    }
+  }
+
+  init();
 </script>
 
 </body>
