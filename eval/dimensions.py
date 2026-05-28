@@ -959,7 +959,230 @@ def score_citation_correctness(cases: list[dict]) -> DimensionScore:
     )
 
 
-# 13. RAG Passage Relevance — REMOVED 2026-05-27.
+# ---------------------------------------------------------------------------
+# 13-16. Tier 1 BUSINESS-VALUE DIMS (AGGREGATE) — eval framework v3
+# ---------------------------------------------------------------------------
+#
+# Operational telemetry to pair with the existing technical-correctness dims.
+# Closes the OKR1 measurement gap: the v2 framework measured governance
+# correctness thoroughly but had ZERO dims for operational outcomes.
+# Strategy doc §1 names "operationally safe AI decision infrastructure" as
+# the moat; v3 makes that measurable.
+#
+# All 4 are AGGREGATE (suite-wide). All require live-mode telemetry that
+# the runner captures via per-pipeline-run wall timing + status tracking.
+# Returns N/A in unit mode (no live runs).
+
+# Rough model token rates (USD per 1M tokens), keyed by snapshot. Used by
+# the cost-estimate dim. These are approximations — real usage telemetry
+# from the SDK is a Phase 3 refinement (Phase 3 backlog item).
+_MODEL_RATES_USD_PER_M = {
+    "claude-opus-4-1-20250805":      {"input": 15.00, "output": 75.00},
+    "claude-sonnet-4-5-20250929":    {"input":  3.00, "output": 15.00},
+    "gpt-4o-2024-11-20":             {"input":  2.50, "output": 10.00},
+}
+
+# Per-case token estimates (heuristic; tightens with real telemetry).
+_TOKENS_PER_AGENT_CALL_INPUT  = 3000
+_TOKENS_PER_AGENT_CALL_OUTPUT = 600
+_TOKENS_PER_JUDGE_CALL_INPUT  = 5000
+_TOKENS_PER_JUDGE_CALL_OUTPUT = 800
+_REPRODUCIBILITY_RUNS = 5
+_AGENTS_PER_RUN = 4
+
+
+def _current_agent_model_snapshot() -> str:
+    """Read the active agent model from env override or model.yaml."""
+    import os as _os
+    override = _os.environ.get("MODEL_SNAPSHOT_OVERRIDE")
+    if override:
+        return override
+    import pathlib as _pl
+    import yaml as _yaml
+    try:
+        cfg_path = _pl.Path(__file__).resolve().parents[1] / "config" / "model.yaml"
+        cfg = _yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        return cfg.get("model_snapshot", "unknown")
+    except Exception:
+        return "unknown"
+
+
+def score_pipeline_wall_time(cases: list[dict]) -> DimensionScore:
+    """
+    p50 of per-pipeline-run wall time across all cases.
+
+    Maps to OKR1 KR1 (TAT proxy). Real provider-facing TAT requires
+    production telemetry (Phase 3 backlog). Target: <60s p50 — informational
+    threshold; tighten with real production data.
+    """
+    target = "<60s"
+    dim = "pipeline_wall_time_p50_seconds"
+    timings: list[float] = []
+    for c in cases:
+        for t in c.get("pipeline_run_wall_seconds") or []:
+            if isinstance(t, (int, float)) and t > 0:
+                timings.append(float(t))
+    if not timings:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No wall-time data (live mode required).",
+            is_aggregate=True,
+        )
+    timings.sort()
+    n = len(timings)
+    p50 = timings[n // 2]
+    p90 = timings[min(n - 1, int(n * 0.9))]
+    p99 = timings[min(n - 1, int(n * 0.99))]
+    return DimensionScore(
+        dimension=dim,
+        score=p50,
+        target=target,
+        passed=p50 < 60.0,
+        notes=(
+            f"p50={p50:.1f}s, p90={p90:.1f}s, p99={p99:.1f}s "
+            f"over {n} pipeline runs. Maps to OKR1 KR1 (TAT proxy)."
+        ),
+        is_aggregate=True,
+    )
+
+
+def score_pipeline_completion_rate(cases: list[dict]) -> DimensionScore:
+    """
+    % of pipeline runs that completed (status == 'completed').
+
+    Catches systemic stability issues invisible to correctness dims —
+    e.g., Opus reasoning_drafter JSON parse failures (Phase 3 #17).
+    Target: >=0.95 — production-grade stability.
+    """
+    target = ">=0.95"
+    dim = "pipeline_completion_rate"
+    total = 0
+    completed = 0
+    escalated = 0
+    failed = 0
+    for c in cases:
+        statuses = c.get("pipeline_run_statuses") or []
+        for s in statuses:
+            total += 1
+            if s == "completed":
+                completed += 1
+            elif s == "escalated":
+                escalated += 1
+            elif s == "failed":
+                failed += 1
+    if total == 0:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No pipeline run statuses (live mode required).",
+            is_aggregate=True,
+        )
+    rate = completed / total
+    return DimensionScore(
+        dimension=dim,
+        score=rate,
+        target=target,
+        passed=rate >= 0.95,
+        notes=(
+            f"{completed}/{total} runs completed "
+            f"({escalated} escalated, {failed} failed)."
+        ),
+        is_aggregate=True,
+    )
+
+
+def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
+    """
+    Estimated USD cost per case (5-run avg) at current model rates.
+
+    Heuristic — uses per-call token estimates × pinned model rates. Real
+    per-call telemetry from the SDK is a Phase 3 refinement.
+    Target: <$2.00/case — informational order-of-magnitude.
+    Maps to OKR1 admin cost reduction.
+    """
+    target = "<$2.00"
+    dim = "estimated_cost_per_case_usd"
+
+    if not cases:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No cases.",
+            is_aggregate=True,
+        )
+
+    agent_model = _current_agent_model_snapshot()
+    agent_rates = _MODEL_RATES_USD_PER_M.get(agent_model)
+    judge_rates = _MODEL_RATES_USD_PER_M.get("gpt-4o-2024-11-20")
+
+    if not agent_rates or not judge_rates:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes=(
+                f"No pricing data for agent model {agent_model!r}. "
+                "Update _MODEL_RATES_USD_PER_M in dimensions.py."
+            ),
+            is_aggregate=True,
+        )
+
+    in_per_case  = _REPRODUCIBILITY_RUNS * _AGENTS_PER_RUN * _TOKENS_PER_AGENT_CALL_INPUT
+    out_per_case = _REPRODUCIBILITY_RUNS * _AGENTS_PER_RUN * _TOKENS_PER_AGENT_CALL_OUTPUT
+    judge_in     = _TOKENS_PER_JUDGE_CALL_INPUT
+    judge_out    = _TOKENS_PER_JUDGE_CALL_OUTPUT
+
+    cost_per_case = (
+        (in_per_case  * agent_rates["input"])  / 1_000_000 +
+        (out_per_case * agent_rates["output"]) / 1_000_000 +
+        (judge_in     * judge_rates["input"])  / 1_000_000 +
+        (judge_out    * judge_rates["output"]) / 1_000_000
+    )
+
+    return DimensionScore(
+        dimension=dim,
+        score=cost_per_case,
+        target=target,
+        passed=cost_per_case < 2.00,
+        notes=(
+            f"~${cost_per_case:.3f}/case using model={agent_model} "
+            f"(5 reps × 4 agents @ ~3.6k tokens each + 1 judge call). "
+            "Heuristic estimate; real telemetry is Phase 3."
+        ),
+        is_aggregate=True,
+    )
+
+
+def score_gate_fire_distribution(cases: list[dict]) -> DimensionScore:
+    """
+    Informational dim (no pass/fail): how many distinct gates fired.
+
+    Sanity check: the build claims 5 hard-control gates. Confirms each is
+    exercised across the eval, not decorative.
+    """
+    target = "informational"
+    dim = "gate_fire_distribution"
+    gate_counts: dict[str, int] = {}
+    for c in cases:
+        for g in c.get("gates_fired") or []:
+            gate_counts[g] = gate_counts.get(g, 0) + 1
+    if not gate_counts:
+        return DimensionScore(
+            dimension=dim, score=None, target=target, passed=None,
+            notes="No gate-fire data (live mode required).",
+            is_aggregate=True,
+        )
+    distinct = len(gate_counts)
+    breakdown = ", ".join(
+        f"{g}={n}" for g, n in sorted(gate_counts.items(), key=lambda kv: -kv[1])
+    )
+    return DimensionScore(
+        dimension=dim,
+        score=float(distinct),
+        target=target,
+        passed=None,
+        notes=f"{distinct} distinct gates fired. Distribution: {breakdown}",
+        is_aggregate=True,
+    )
+
+
+# 17. RAG Passage Relevance — REMOVED 2026-05-27.
 #
 # This dim was added earlier today (Phase 2 §12 deliverable) but cut when
 # the full RAG initiative was deferred to Phase 3. Reasoning: the dim

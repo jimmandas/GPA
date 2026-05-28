@@ -84,6 +84,11 @@ from eval.dimensions import (
     score_physician_rationale_compliance,
     score_bias_disparity,
     score_citation_correctness,
+    # Tier 1 business-value dims (eval framework v3)
+    score_pipeline_wall_time,
+    score_pipeline_completion_rate,
+    score_estimated_cost_per_case_usd,
+    score_gate_fire_distribution,
 )
 
 
@@ -103,6 +108,10 @@ class EvalCase:
     policy_map: dict
     pipeline_status: str
     gates_fired: list[str]
+    # Per-run telemetry (Tier 1 business-value dims; eval framework v3)
+    # Length matches REPRODUCIBILITY_RUNS for live cases; empty in unit mode.
+    pipeline_run_wall_seconds: list[float] = None  # type: ignore[assignment]
+    pipeline_run_statuses: list[str] = None        # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +220,9 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
                 for ds in ec.dimension_scores
                 if ds.score is not None
             },
+            # Tier 1 business-value telemetry (eval framework v3)
+            "pipeline_run_wall_seconds": ec.pipeline_run_wall_seconds or [],
+            "pipeline_run_statuses": ec.pipeline_run_statuses or [],
         }
         for ec in eval_cases
     ]
@@ -225,14 +237,21 @@ def run_eval(live: bool = False) -> tuple[list[EvalCase], list[DimensionScore]]:
         _phys_queue = None
 
     aggregate_scores = [
+        # Scope §7 original 4
         score_adversarial_gate_bypass_rate(cases_for_aggregates),
         score_false_escalation_rate(cases_for_aggregates),
         score_confidence_calibration(cases_for_aggregates),
         score_cohens_kappa(cases_for_aggregates),
+        # Phase 2 §12 + scope-additions
         score_physician_queue_routing_accuracy(cases_for_aggregates, physician_queue=_phys_queue),
         score_physician_rationale_compliance(physician_queue=_phys_queue),
         score_bias_disparity(cases_for_aggregates),
         score_citation_correctness(cases_for_aggregates),
+        # Tier 1 business-value dims (eval framework v3 — 2026-05-28)
+        score_pipeline_wall_time(cases_for_aggregates),
+        score_pipeline_completion_rate(cases_for_aggregates),
+        score_estimated_cost_per_case_usd(cases_for_aggregates),
+        score_gate_fire_distribution(cases_for_aggregates),
     ]
     return eval_cases, aggregate_scores
 
@@ -301,12 +320,20 @@ def _run_unit_case(case_id: str, ground_truth: dict) -> EvalCase:
         reasoning_brief=reasoning_brief,
         policy_map=policy_map,
         pipeline_status="unit_mode",
-        gates_fired=["admission", "source_verification", "ai_decision_limit", "denial"],
+        # All 5 hard control gates fire when the pipeline runs end-to-end
+        # (confidence gate added as 5th in ADR-015, 2026-05-27).
+        gates_fired=[
+            "admission", "source_verification", "ai_decision_limit",
+            "denial", "confidence",
+        ],
+        pipeline_run_wall_seconds=[],
+        pipeline_run_statuses=[],
     )
 
 
 def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
     """Run the pipeline N times (for reproducibility) and score per-case dimensions."""
+    import time as _time
     from orchestrator.pipeline import run_pipeline
 
     fixtures_dir = (
@@ -316,7 +343,18 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
     submission_path = fixtures_dir / f"{case_id}.json"
     submission = json.loads(submission_path.read_text(encoding="utf-8"))
 
-    pipeline_results = [run_pipeline(submission) for _ in range(REPRODUCIBILITY_RUNS)]
+    # Capture per-run wall time and status for the v3 business-value dims:
+    # pipeline_wall_time_p50_seconds and pipeline_completion_rate.
+    pipeline_results = []
+    run_wall_seconds: list[float] = []
+    run_statuses: list[str] = []
+    for _ in range(REPRODUCIBILITY_RUNS):
+        _t0 = _time.perf_counter()
+        pr = run_pipeline(submission)
+        run_wall_seconds.append(_time.perf_counter() - _t0)
+        run_statuses.append(pr.status)
+        pipeline_results.append(pr)
+
     overall_signals: list[str | None] = []
     for pr in pipeline_results:
         pm = (pr.determination or {}).get("policy_map", {}) if pr.determination else {}
@@ -346,13 +384,17 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
         agent_outputs = []
         agent_names = []
 
-    # Track which gates fired for this case (admission always fires; source_verification
-    # gating depends on pipeline reaching that step)
+    # Track which gates fired for this case. All 5 hard controls fire on a
+    # completed pipeline run. Source verification only reached if pipeline
+    # didn't hit an earlier failure mode.
     gates_fired = ["admission"]
     if primary.status != "failed":
         gates_fired.append("source_verification")
     gates_fired.append("ai_decision_limit")
     gates_fired.append("denial")
+    # Confidence gate fires after policy_mapper (ADR-015, added as 5th gate)
+    if primary.status != "failed":
+        gates_fired.append("confidence")
 
     scores = _per_case_scores(
         reasoning_brief=reasoning_brief,
@@ -373,6 +415,8 @@ def _run_live_case(case_id: str, ground_truth: dict) -> EvalCase:
         policy_map=policy_map,
         pipeline_status=primary.status,
         gates_fired=gates_fired,
+        pipeline_run_wall_seconds=run_wall_seconds,
+        pipeline_run_statuses=run_statuses,
     )
 
 

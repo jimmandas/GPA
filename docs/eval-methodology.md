@@ -6,7 +6,10 @@ This document captures the eval design per `imaging-pa-poc-scope.md §7-§8` plu
 
 ---
 
-## The 12 active dimensions
+## The 16 active dimensions (v3)
+
+**Eval framework v3** (2026-05-28) adds 4 Tier 1 business-value dims to v2's
+12 RAI-aligned correctness dims. See `CHANGELOG.md` for the v2→v3 changelog.
 
 ### Per-case (4) — from scope §7
 
@@ -39,6 +42,19 @@ This document captures the eval design per `imaging-pa-poc-scope.md §7-§8` plu
 |---|---|---|---|
 | 11 | `bias_disparity` | Max spread of per-case scores (source_citation_accuracy / rationale_faithfulness / decision_reproducibility) across `label` and `expected_overall_signal` cohorts | max spread < 0.20 |
 | 12 | `citation_correctness` | Precision of cited NCCN passage IDs (`policy_map.criteria[].nccn_passage_id` + `policy_map.passage_ids_used`) vs. `ground_truth.expected_criterion_status` keys. Closes scope §8 Failure Mode #9 (Faithful-but-Wrong) | >=0.95 |
+
+### Tier 1 business-value (v3 — 2026-05-28)
+
+Aggregate dims that close the OKR1 measurement gap (operational outcomes).
+Runner captures per-pipeline-run wall time and status; these dims aggregate
+across all cases × reps.
+
+| # | Dimension | Computed from | Target |
+|---|---|---|---|
+| 13 | `pipeline_wall_time_p50_seconds` | p50 of `time.perf_counter()` deltas around `run_pipeline()` across all cases × reps | <60s (informational; tighten with real production data) |
+| 14 | `pipeline_completion_rate` | % of pipeline runs returning status='completed' (vs. 'escalated' or 'failed'). Catches stability issues invisible to correctness dims | >=0.95 |
+| 15 | `estimated_cost_per_case_usd` | Heuristic: per-call token estimates × pinned model rates (Opus / Sonnet / GPT-4o judge). Phase 3 #19 replaces with real SDK telemetry | <$2.00 |
+| 16 | `gate_fire_distribution` | Count of `gates_fired` entries per gate type across all runs. Score = number of distinct gates. Informational (no pass/fail) | — |
 
 ### Removed during Phase 2 reality-check
 

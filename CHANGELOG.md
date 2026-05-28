@@ -4,6 +4,44 @@ Material version bumps. Scope-level changes that affect what the system claims t
 
 ---
 
+## eval framework v3 — business-value dims (Tier 1 — 2026-05-28)
+
+**Headline:** Adds 4 operational/business-value dims to the 12 correctness dims. Closes the OKR1 measurement gap: v2 measured governance correctness thoroughly but had ZERO dims for operational outcomes (TAT, cost, stability, gate usage). v3 makes operationally-acceptable measurable.
+
+### What's new in v3 — 4 new aggregate dims
+
+13. `pipeline_wall_time_p50_seconds` — Operational (OKR1 KR1 TAT proxy). p50 of per-pipeline-run wall time across all cases. Target: <60s.
+14. `pipeline_completion_rate` — Operational (production stability). % of pipeline runs returning a `completed` determination. Catches systemic stability issues invisible to correctness dims (e.g., Opus reasoning_drafter JSON parse failures). Target: >=0.95.
+15. `estimated_cost_per_case_usd` — Operational (OKR1 admin cost proxy). Heuristic estimate based on per-call token estimates × pinned model rates. Real telemetry is Phase 3 (#19). Target: <$2.00.
+16. `gate_fire_distribution` — Trustworthy / operational (gate-usage sanity check). Informational dim with no pass/fail — confirms each of the 5 hard-control gates IS being exercised.
+
+### Why v3 deserves a version bump
+
+Previous bumps (v1 → v2) were about correctness coverage. v3 changes WHAT the eval claims:
+
+- **v2 framing:** *"The AI behaves correctly across 12 RAI-aligned dimensions."*
+- **v3 framing:** *"The AI behaves correctly AND has measurable operational properties (cost, latency, stability)."*
+
+For a hiring-manager/regulator audience, this is the difference between *"the AI does the right thing"* and *"the AI does the right thing AND is operationally accountable."* Strategy doc §1 demands the second.
+
+### Runner instrumentation
+
+`eval/runner.py._run_live_case` now captures per-pipeline-run wall time (`time.perf_counter()`) and status (`pr.status`). Both flow through `EvalCase.pipeline_run_wall_seconds` / `pipeline_run_statuses` into the aggregate phase. Backward-compatible — unit-mode cases have empty lists, dims return N/A cleanly.
+
+### Tier 2/3 deferred (logged in PHASE_3_BACKLOG.md items #18 + #19)
+
+- Tier 2 (need ground-truth fields): `tat_reduction_estimate`, `nurse_time_saved_per_brief_minutes`, `over_review_rate`. All three require baselines or nurse-pilot data we don't have yet.
+- Tier 3 (need production telemetry): actual TAT, member satisfaction, appeal rate change, real token cost. All require months of operational deployment.
+
+### Compatibility
+
+- 12 v2 dims unchanged. v3 is purely additive.
+- Determinism Contract unchanged.
+- Runner signature unchanged. `python eval/save_report.py` produces a v3 report.
+- Test contract: aggregate dim count is now 12 (was 8). `test_eval_harness.py::test_run_eval_unit_mode_aggregate_dim_names` updated with the new 4.
+
+---
+
 ## eval framework v2 — RAI-aligned expansion (2026-05-27)
 
 **Headline:** Eval coverage expanded from 8 dimensions (scope §7 original) to **12 active dimensions** explicitly mapped to the 6 Responsible AI evaluation categories (safety, grounding, policy compliance, HITL, explainability, fairness).

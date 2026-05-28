@@ -2,7 +2,7 @@
 
 **Owner:** Jim
 **Last updated:** 2026-05-27
-**Eval framework version:** **v2** (RAI-aligned expansion; 12 active dims; see `SCOPE_DELTAS.md`)
+**Eval framework version:** **v3** (RAI-aligned + business-value; 16 active dims; see `CHANGELOG.md`)
 **Phase 2 build version:** in-development (Week 11-12)
 **Source-of-truth docs:** see "Canonical Docs" below
 

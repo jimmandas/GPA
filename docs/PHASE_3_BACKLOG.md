@@ -74,6 +74,27 @@
 - **Why deferred:** User passed on judge calibration tracks in 2026-05-27 session. The path stays available.
 - **Trigger to prioritize:** Faithfulness scores need to be production-defensible to a regulator OR the daily judge starts looking like the bottleneck on detecting issues.
 
+### 18. Tier 2 business-value eval dims (need ground-truth fields)
+
+- **Date logged:** 2026-05-28
+- **What:** Three dims that close OKR1-outcome measurement but need data we don't have yet.
+  - `tat_reduction_estimate` — system wall-time vs. published manual-review baselines for PA. Requires either a hard-coded baseline (e.g., "5 min per case manual" from published UM studies) OR a real pilot pre/post comparison.
+  - `nurse_time_saved_per_brief_minutes` — workflow compression value. Needs either nurse-pilot data OR a heuristic based on `uncertainty_flag` count × seconds-per-flag-review.
+  - `over_review_rate` — % of cases where the nurse reads the brief but doesn't gain new info vs. what she'd have decided without it. Requires nurse-pilot data; not feasible without real users.
+- **Why deferred:** All three require external data (baselines or pilot users). The Tier 1 dims (v3 — pipeline_wall_time, completion_rate, cost_estimate, gate_fire_distribution) cover what's measurable today without external data.
+- **Trigger to prioritize:** Pilot deployment with real nurses OR commitment to a quantified TAT-reduction claim that needs a defensible baseline.
+
+### 19. Tier 3 business-value eval dims (need production telemetry)
+
+- **Date logged:** 2026-05-28
+- **What:** Dims that only make sense once the system has real production deployment.
+  - `actual_provider_TAT_minutes` — measured from real provider submission → notification timestamps
+  - `actual_member_satisfaction_delta` — pre/post member surveys
+  - `appeal_rate_change` — operational outcome over months
+  - `production_token_cost_actual` — real SDK telemetry replacing the v3 heuristic
+- **Why deferred:** All four require months of operational data. Out of scope for Phase 2 (POC) and Phase 3 (until a real pilot).
+- **Trigger to prioritize:** Live production pilot OR commitment to operational outcomes claims that need actuals not estimates.
+
 ### 17. Opus reasoning_drafter JSON parse stability
 
 - **Date logged:** 2026-05-28 (surfaced by the 2026-05-27 ship-tier eval)

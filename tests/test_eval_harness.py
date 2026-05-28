@@ -308,11 +308,14 @@ def test_run_eval_unit_mode():
         assert isinstance(case.dimension_scores, list)
         # Per-case has exactly 4 dims (2 computable in unit mode + 2 deferred)
         assert len(case.dimension_scores) == 4
-    # 8 aggregate dimensions after Phase 2 additions (2026-05-27): the original
-    # 4 scope dims (gate_bypass, false_escalation, calibration, kappa) plus 4
-    # additions — physician_queue_routing_accuracy, physician_rationale_compliance,
-    # bias_disparity, citation_correctness.
-    assert len(aggregates) == 8
+    # 12 aggregate dimensions after eval framework v3 (2026-05-28):
+    #   - 4 scope §7 originals
+    #   - 4 Phase 2 / scope additions (physician_queue_routing_accuracy,
+    #     physician_rationale_compliance, bias_disparity, citation_correctness)
+    #   - 4 Tier 1 business-value (pipeline_wall_time_p50_seconds,
+    #     pipeline_completion_rate, estimated_cost_per_case_usd,
+    #     gate_fire_distribution)
+    assert len(aggregates) == 12
 
 
 def test_run_eval_unit_mode_per_case_dim_names():
@@ -339,9 +342,14 @@ def test_run_eval_unit_mode_aggregate_dim_names():
         # Phase 2 §12 additions
         "physician_queue_routing_accuracy",
         "physician_rationale_compliance",
-        # Scope-additions (this build)
-        "bias_disparity",         # ADR-018
-        "citation_correctness",   # Failure Mode #9 closure (2026-05-27)
+        # Scope-additions (v2)
+        "bias_disparity",                  # ADR-018
+        "citation_correctness",            # Failure Mode #9 closure (2026-05-27)
+        # Tier 1 business-value (v3 — 2026-05-28)
+        "pipeline_wall_time_p50_seconds",  # TAT proxy
+        "pipeline_completion_rate",        # stability
+        "estimated_cost_per_case_usd",     # admin cost proxy
+        "gate_fire_distribution",          # gate exercise sanity check
     }
     actual = {ds.dimension for ds in aggregates}
     assert actual == expected

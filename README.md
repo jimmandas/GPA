@@ -5,18 +5,22 @@ written for the "governed agentic workflows" pattern: every agent call is
 hashed, every decision is logged write-before-emit, and a per-dimension eval
 harness measures the system end-to-end.
 
-**Status (2026-05-27):** Phase 2 MVP — nurse-anchored governance proof. 5 hard
+**Status (2026-05-28):** Phase 2 MVP — nurse-anchored governance proof. 5 hard
 control gates (admission, source_verification, ai_decision_limit, denial,
-confidence), end-to-end physician peer-review workflow, **eval framework v2 —
-12 active dimensions aligned to the 6 Responsible AI evaluation categories**
-(safety, grounding, policy compliance, HITL, explainability, fairness),
-EVAL_TIER system (dev/Sonnet vs ship/Opus), scope baseline + delta log.
+confidence), end-to-end physician peer-review workflow, **eval framework v3 —
+16 active dimensions: 12 RAI-aligned correctness dims + 4 operational
+business-value dims** (TAT proxy, cost estimate, pipeline completion rate,
+gate-fire sanity check). EVAL_TIER system (dev/Sonnet vs ship/Opus). Scope
+baseline + delta log.
 
-## Responsible AI eval framework (v2)
+## Responsible AI eval framework (v3)
 
 Strategy §6 names Responsible AI as a **core system constraint, not a downstream
-review phase**. The eval framework v2 operationalizes this with 12 active dims
-explicitly mapped to the six RAI categories.
+review phase**. The eval framework v3 operationalizes this with 16 active dims:
+**12 mapped to the six RAI evaluation categories** (safety, grounding, policy
+compliance, HITL, explainability, fairness) plus **4 business-value /
+operational dims** that close the OKR1 measurement gap (latency, cost, stability,
+gate exercise).
 
 | RAI Category | Dims Covering It |
 |---|---|
@@ -48,7 +52,7 @@ See `docs/eval-methodology.md` for the canonical reference and
 | `physician_queue/` | **(Phase 2)** PhysicianQueue ABC + FilePhysicianQueue + ActionRecord for peer review workflow |
 | `rag/` | PolicyRetriever ABC + FixtureRetriever (active). Real RAG pipeline is Phase 3 — see `docs/PHASE_3_BACKLOG.md` item #10 |
 | `logs/bilateral_logger.py` | Write-before-emit audit log (now also receives `physician_action_record` events) |
-| `eval/` | Eval harness — **12 dimensions** + ConfidenceCalibrator + EVAL_TIER system (see `docs/eval-methodology.md`) |
+| `eval/` | Eval harness — **16 dimensions** + ConfidenceCalibrator + EVAL_TIER system (see `docs/eval-methodology.md`) |
 | `api/main.py` | FastAPI app — pipeline endpoints, nurse queue/case endpoints, audit endpoints, physician queue/action endpoints |
 | `ui/*.html` | Static review UI: `queue.html` (nurse queue), `nurse_workspace.html`, `physician_queue.html`, `physician_workspace.html`, `index.html` (audit viewer). All wired to live API |
 | `prompts/` | System prompts for each agent (hash-pinned in `config/prompt_hashes.yaml`) |
@@ -111,7 +115,7 @@ SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/runner.py
 
 The `PYTHONPATH=.` is required — without it the module imports fail.
 
-Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. The **12 active dimensions** (see `docs/eval-methodology.md` for full reference):
+Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. The **16 active dimensions** (see `docs/eval-methodology.md` for full reference):
 
 | # | Dimension | Layer | Target |
 |---|---|---|---|
@@ -127,6 +131,10 @@ Output is a markdown report saved to `eval/results/eval_report_<timestamp>.md`. 
 | 10 | physician_rationale_compliance | aggregate (Phase 2 §12) | >=0.95 |
 | 11 | bias_disparity | aggregate (ADR-018 scope-addition) | max spread <0.20 |
 | 12 | citation_correctness | aggregate (closes scope §8 Failure Mode #9) | >=0.95 |
+| 13 | pipeline_wall_time_p50_seconds | aggregate (Tier 1 business-value; TAT proxy) | <60s |
+| 14 | pipeline_completion_rate | aggregate (Tier 1; production stability) | >=0.95 |
+| 15 | estimated_cost_per_case_usd | aggregate (Tier 1; admin cost proxy, heuristic) | <$2.00 |
+| 16 | gate_fire_distribution | aggregate (Tier 1; gate-usage sanity, informational) | — |
 
 **Eval tiers** (ADR-017):
 

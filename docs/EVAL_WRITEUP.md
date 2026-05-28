@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-I built a multi-agent prior-authorization review system with hard runtime governance controls, and then I built an eval framework — currently at **v2, 12 active dimensions** — that surfaces real failures in the system AND in its own design. The framework is mapped to the **6 Responsible AI evaluation categories** (safety, grounding, policy compliance, HITL, explainability, fairness) the strategy framing doc names as core constraints, and structured around the Helpful / Honest / Harmless (3H) safety principles plus a Trustworthy dimension that matters specifically for AI-era systems.
+I built a multi-agent prior-authorization review system with hard runtime governance controls, and then I built an eval framework — currently at **v3, 16 active dimensions** — that surfaces real failures in the system AND in its own design. The framework is mapped to the **6 Responsible AI evaluation categories** (safety, grounding, policy compliance, HITL, explainability, fairness) the strategy framing doc names as core constraints, structured around the Helpful / Honest / Harmless (3H) safety principles plus a Trustworthy dimension that matters for AI-era systems — and **v3 added 4 business-value dims** (latency, cost, stability, gate exercise) so the framework now answers not just "does the AI behave correctly?" but also "is the AI operationally accountable?"
 
 The eval is not a strawman. It found:
 - 2 reproducibility failures in v1; drove a v2 fix that partially worked; pointed at a v3 architectural change (temperature=0 via direct anthropic SDK) that closes the residual on Opus
