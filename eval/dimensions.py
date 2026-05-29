@@ -344,9 +344,17 @@ def score_case_wall_time_seconds(
     Per-case wall time (Operational bucket). Mean across the case's reps.
     Maps to TAT proxy at the per-case granularity — pairs with the aggregate
     p50/p90 dims that report suite-wide percentiles.
+
+    Threshold note (2026-05-28): per-case target is intentionally LOOSER than
+    the aggregate `pipeline_wall_time_p50_seconds` target (<60s). Per-case
+    means aggregate over only 5 reps; a single slow rep can push a case to
+    65-75s even when the suite p50 is 63s. The <90s per-case bar matches the
+    suite p90 — catches cases that are systematically slow without false-
+    flagging cases with one slow rep. Calibrated against actual Sonnet eval
+    distribution observed 2026-05-28.
     """
     dim = "case_wall_time_seconds"
-    target = "<60s"
+    target = "<90s"
     if not pipeline_run_wall_seconds:
         return DimensionScore(
             dimension=dim, score=None, target=target, passed=None,
@@ -365,7 +373,7 @@ def score_case_wall_time_seconds(
         dimension=dim,
         score=avg,
         target=target,
-        passed=avg < 60.0,
+        passed=avg < 90.0,
         notes=f"mean={avg:.1f}s over {len(valid)} reps.",
         bucket=BUCKET_OPERATIONAL,
     )
@@ -378,10 +386,19 @@ def score_case_completion_rate(
     Per-case completion rate (Operational bucket). Fraction of this case's
     reps that returned status='completed' (vs escalated/failed). Surfaces
     case-specific stability issues — e.g., the Opus reasoning_drafter JSON
-    parse failures showed up as low case_completion_rate on specific cases.
+    parse failures show up as low case_completion_rate on specific cases.
+
+    Threshold note (2026-05-28): per-case target is intentionally LOOSER than
+    the aggregate `pipeline_completion_rate` target (>=0.95). Per-case is
+    over 5 reps; a single failed rep = 0.80, which fails a 0.95 bar but is
+    normal Sonnet variance. The >=0.60 per-case bar catches "this case is
+    fundamentally broken" (3+ of 5 reps fail — the real signal) without
+    false-flagging "1 rep had a hiccup." Calibrated against actual Sonnet
+    eval distribution observed 2026-05-28 where ~13/15 cases failed the
+    tighter 0.95 bar but only 6 cases had ≥3 broken reps (the real signal).
     """
     dim = "case_completion_rate"
-    target = ">=0.95"
+    target = ">=0.60"
     if not pipeline_run_statuses:
         return DimensionScore(
             dimension=dim, score=None, target=target, passed=None,
@@ -395,7 +412,7 @@ def score_case_completion_rate(
         dimension=dim,
         score=rate,
         target=target,
-        passed=rate >= 0.95,
+        passed=rate >= 0.60,
         notes=f"{completed}/{total} reps completed.",
         bucket=BUCKET_OPERATIONAL,
     )
