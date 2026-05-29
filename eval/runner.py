@@ -34,6 +34,13 @@ Usage:
 
 from __future__ import annotations
 
+# Load .env BEFORE any SDK import so anthropic / openai SDKs find their
+# auth from disk regardless of shell env. Outside Cowork's managed proxy
+# (which injects auth via ANTHROPIC_BASE_URL), the .env keys are the only
+# auth source. Same pattern in eval/save_report.py.
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 
 # Eval tier gates the agent model. Must run before any agent import,

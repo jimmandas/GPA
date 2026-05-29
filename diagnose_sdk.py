@@ -10,6 +10,10 @@ import sys
 import json
 import asyncio
 
+# Load .env BEFORE any SDK import (anthropic / openai pick up keys at init)
+from dotenv import load_dotenv
+load_dotenv()
+
 
 def test_imports():
     """Check if required packages are available."""

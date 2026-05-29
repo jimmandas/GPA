@@ -11,6 +11,12 @@ Endpoints:
   GET  /api/v1/health                  — liveness check
 """
 
+# Load .env BEFORE any SDK import. Today no endpoint calls anthropic/openai
+# directly, but the pipeline imports do (policy_mapper uses anthropic SDK).
+# Defensive: keeps the API portable outside Cowork's managed auth.
+from dotenv import load_dotenv
+load_dotenv()
+
 import json
 import pathlib
 from dataclasses import asdict

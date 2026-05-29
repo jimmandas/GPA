@@ -9,6 +9,10 @@ Not part of the eval harness. Not committed long-term.
 
 from __future__ import annotations
 
+# Load .env BEFORE importing rationale_judge (which inits the OpenAI client)
+from dotenv import load_dotenv
+load_dotenv()
+
 import json
 import pathlib
 import sys
