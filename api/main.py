@@ -367,6 +367,103 @@ def admin_reset_demo_data(request: AdminResetRequest):
     return {"reset": True, "cleared": cleared}
 
 
+class AdminResetCaseStatesRequest(BaseModel):
+    confirm: str = Field(..., description="Must equal 'yes-reset-case-states'")
+
+
+@app.post("/api/v1/admin/reset-case-states")
+def admin_reset_case_states(request: AdminResetCaseStatesRequest):
+    """Strip nurse_action_record + physician_action_record entries from
+    decision_log/case_*.jsonl so the nurse + physician queues revert to
+    `pending_review`. **Demo-only.**
+
+    Preserved on disk (governance story intact):
+      - agent_event (every Claude/Anthropic call hashed)
+      - schema_validation_event
+      - pre_state_record (the bilateral logger pre-write)
+      - escalation_event
+      - any other non-action record types
+
+    Removed:
+      - nurse_action_record
+      - physician_action_record
+
+    Also resets the physician queue's state.json (otherwise the queue would
+    still hold any cases that had been routed to physician review).
+
+    In production this endpoint would NOT exist — you cannot delete a nurse
+    or physician decision from a real audit trail. Demo-only convenience.
+    """
+    if request.confirm != "yes-reset-case-states":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="confirm must equal 'yes-reset-case-states' to proceed.",
+        )
+
+    _ACTION_TYPES_TO_STRIP = {"nurse_action_record", "physician_action_record"}
+    cleared = {
+        "files_touched": 0,
+        "nurse_actions_removed": 0,
+        "physician_actions_removed": 0,
+        "physician_queue_entries": 0,
+    }
+
+    log_dir = _REPO_ROOT / "decision_log"
+    if log_dir.exists():
+        for f in log_dir.glob("case_*.jsonl"):
+            try:
+                lines = f.read_text(encoding="utf-8").splitlines()
+            except OSError:
+                continue
+            kept: list[str] = []
+            file_n_nurse = 0
+            file_n_phys = 0
+            for line in lines:
+                line_stripped = line.strip()
+                if not line_stripped:
+                    continue
+                try:
+                    rec = json.loads(line_stripped)
+                except json.JSONDecodeError:
+                    kept.append(line)
+                    continue
+                rec_type = rec.get("type")
+                if rec_type in _ACTION_TYPES_TO_STRIP:
+                    if rec_type == "nurse_action_record":
+                        file_n_nurse += 1
+                    elif rec_type == "physician_action_record":
+                        file_n_phys += 1
+                    continue
+                kept.append(line)
+            if file_n_nurse > 0 or file_n_phys > 0:
+                cleared["files_touched"] += 1
+                cleared["nurse_actions_removed"] += file_n_nurse
+                cleared["physician_actions_removed"] += file_n_phys
+                # Atomic rewrite — fsync to mirror bilateral logger's durability
+                content = ("\n".join(kept) + "\n") if kept else ""
+                tmp = f.with_suffix(f.suffix + ".tmp")
+                tmp.write_text(content, encoding="utf-8")
+                tmp.replace(f)
+
+    # Also reset the physician queue's state.json so any in-flight routings
+    # don't survive the case-state reset.
+    state_path = _REPO_ROOT / "physician_queue" / "state.json"
+    if state_path.exists():
+        try:
+            existing = json.loads(state_path.read_text(encoding="utf-8"))
+            cleared["physician_queue_entries"] = len(existing.get("entries", []))
+        except Exception:
+            cleared["physician_queue_entries"] = -1
+        state_path.write_text('{"entries": [], "actions": []}\n', encoding="utf-8")
+    try:
+        from physician_queue import queue as queue_mod
+        queue_mod._DEFAULT_QUEUE = None
+    except Exception:
+        pass
+
+    return {"reset": True, "cleared": cleared}
+
+
 # ---------------------------------------------------------------------------
 # Nurse queue + per-case endpoints (Loom-readiness, 2026-05-27)
 # ---------------------------------------------------------------------------

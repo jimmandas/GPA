@@ -140,9 +140,6 @@
   <div>
     <h1>GPA v4 · Admin <span class="role-pill">DEMO OPERATOR</span></h1>
   </div>
-  <div class="nav-links">
-    <a href="index.html">← Dashboard</a>
-  </div>
 </header>
 
 <main>
@@ -166,6 +163,24 @@
     </ul>
     <button class="btn danger" id="reset-btn">Reset Demo Data</button>
     <div class="feedback" id="reset-feedback"></div>
+  </div>
+
+  <!-- Reset Demo Case States -->
+  <div class="panel">
+    <h2>Reset Demo Case States</h2>
+    <p class="desc">
+      Reverts every case in the nurse + physician queues back to
+      <code>pending_review</code> for a fresh demo recording. <strong>Demo-only</strong>
+      — this endpoint would not exist in production (you can't delete a real
+      nurse or physician decision from an audit trail).
+    </p>
+    <ul>
+      <li><strong>Removes</strong> <code>nurse_action_record</code> + <code>physician_action_record</code> entries from <code>decision_log/case_*.jsonl</code></li>
+      <li><strong>Preserves</strong> the rest of each file: agent events (every Claude call hashed), schema-validation events, pre-state records, escalation events — the governance story stays intact, you can still see HOW the AI produced each brief</li>
+      <li>Resets <code>physician_queue/state.json</code> as well</li>
+    </ul>
+    <button class="btn danger" id="reset-cases-btn">Reset Demo Case States</button>
+    <div class="feedback" id="reset-cases-feedback"></div>
   </div>
 
   <!-- Eval Commands Reference (intentionally NOT a button) -->
@@ -266,6 +281,53 @@
     } finally {
       btn.disabled = false;
       btn.textContent = "Reset Demo Data";
+    }
+  });
+
+  document.getElementById("reset-cases-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("reset-cases-btn");
+    const fb = document.getElementById("reset-cases-feedback");
+
+    if (!confirm(
+      "Reset demo case states?\n\n" +
+      "Strips ALL nurse and physician action records from decision_log/case_*.jsonl, " +
+      "reverting every case in the nurse + physician queues to pending_review.\n\n" +
+      "Agent events, gate events, and pre-state records are PRESERVED. " +
+      "The governance story stays intact.\n\n" +
+      "Demo-only — this would not exist in production."
+    )) {
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Resetting…";
+    fb.className = "feedback";
+
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/admin/reset-case-states`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "yes-reset-case-states" }),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        fb.className = "feedback error";
+        fb.textContent = `Reset failed (HTTP ${r.status}): ${esc(d.detail || r.statusText)}`;
+      } else {
+        const c = d.cleared || {};
+        fb.className = "feedback success";
+        fb.textContent =
+          `Reset OK. ${c.files_touched ?? 0} case file(s) modified; ` +
+          `removed ${c.nurse_actions_removed ?? 0} nurse action(s) and ` +
+          `${c.physician_actions_removed ?? 0} physician action(s). ` +
+          `Cleared ${c.physician_queue_entries ?? 0} queue entries.`;
+      }
+    } catch (err) {
+      fb.className = "feedback error";
+      fb.textContent = `Network error: ${esc(String(err))}`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Reset Demo Case States";
     }
   });
 </script>
