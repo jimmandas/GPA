@@ -13,6 +13,60 @@ business-value dims** (TAT proxy, cost estimate, pipeline completion rate,
 gate-fire sanity check). EVAL_TIER system (dev/Sonnet vs ship/Opus). Scope
 baseline + delta log.
 
+## Quick start — bring up the demo
+
+Start the API + the static UI in two Bash invocations from the repo root:
+
+```bash
+# 1. FastAPI server on :8000 (serves all /api/v1/* endpoints)
+PYTHONPATH=. uvicorn api.main:app --port 8000 --reload &
+
+# 2. Static UI server on :8001 (serves the HTML pages in ui/)
+python -m http.server 8001 --directory ui &
+```
+
+Then open these URLs in a browser:
+
+| Page | URL | Purpose |
+|---|---|---|
+| **Dashboard (hiring-manager view)** | http://localhost:8001/index.html | Start here. Pipeline Trace hero + nurse/physician queue counts + eval report card with 3-bucket framing. |
+| Pipeline Trace | http://localhost:8001/pipeline_trace.html | Architecture lens — pick a case, watch 4 agents + 5 gates fire end-to-end (~20–60s). Demo-only, not nurse-facing. |
+| Nurse queue | http://localhost:8001/queue.html | Pending cases. Click to enter the per-case workspace. |
+| Nurse workspace | http://localhost:8001/nurse_workspace.html?case_id=case_0001 | Review AI brief; approve / escalate / pend with rationale. |
+| Physician queue | http://localhost:8001/physician_queue.html | Cases escalated by nurse for peer review. |
+| Physician workspace | http://localhost:8001/physician_workspace.html?case_id=case_0002 | Record physician action — approve / deny / request additional evidence with clinical basis + guideline citation. |
+| Eval report (latest) | http://localhost:8001/eval_report_view.html | Full markdown of the latest `eval_report_*.md`. |
+| **Admin (hidden — operator only)** | http://localhost:8001/admin.html | Reset Demo Data + Reset Demo Case States + eval CLI reference + Audit Log access. Not linked from anywhere. |
+| Audit log | http://localhost:8001/audit.html | Bilateral logger viewer. Reachable only via admin. |
+
+**API health check (verify uvicorn is up):**
+
+```bash
+curl http://localhost:8000/api/v1/health
+# {"status":"ok","service":"gpa-v4"}
+```
+
+**Stop both servers:**
+
+```bash
+# Lists the two background jobs (uvicorn + http.server); kill by PID or job number
+jobs -l
+kill %1 %2     # or kill <PID>
+```
+
+**Run an eval to populate the dashboard with fresh numbers:**
+
+```bash
+# Dev tier (Sonnet, ~50–80 min wall) — default
+SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/save_report.py
+
+# Ship tier (Opus, ~90–120 min wall) — requires explicit approval
+EVAL_TIER=ship SHIP_TIER_APPROVED=yes \
+  SKIP_INTEGRATION_TESTS=0 PYTHONPATH=. python eval/save_report.py
+```
+
+The dashboard auto-discovers the newest report in `eval/results/` — no restart needed.
+
 ## Responsible AI eval framework (v3)
 
 Strategy §6 names Responsible AI as a **core system constraint, not a downstream
