@@ -121,13 +121,27 @@ Report: `eval/results/eval_report_20260529_205655.md`
    - **Payoff:** Production-ready audit storage, doc-level locking for concurrent nurses, indexed dashboard queries (50ms vs. 2s file iteration)
    - **Commit:** `5694f46` (2026-06-04)
 
-**⏭️ NEXT (Phase 3a Week 4+):**
-3. **Web UI dashboard + per-case audit trail view** (optional; depends on pilot readiness)
-   - New page: `ui/cases.html` — case status table, real-time filtering
-   - Detail modal: click case → audit trail with JWS signature verification badge
-   - API endpoints: Wire `/api/v1/cases` to MongoDB queries (status, created_at filters)
-   - Signature verification: Browser-side using public key from repo (`config/public_key.pem`)
-   - **Decision:** Wire this into API only if pilot volume reaches 50+ concurrent nurses or 100+ cases/day; otherwise JSONL + CLI verification sufficient
+**✅ COMPLETED (2026-06-04):**
+3. **Phase 3a Week 4:** Case Status Dashboard UI ✓ (backend-agnostic via CaseStore)
+   - ✅ New: `ui/cases.html` — status-filtered case table + click-into audit modal
+   - ✅ New: `persistence/jsonl_store.py` — real JSONLCaseStore read path (was a stub)
+   - ✅ New API: `GET /api/v1/cases` (+ `?status=` filter) and `GET /api/v1/cases/{id}/audit`
+   - ✅ Refactor: `verify_audit_log.verify_records()` — backend-agnostic chain+signature
+     verifier (works for JSONL files AND in-memory MongoDB records; single source of truth)
+   - ✅ Modal renders per-record "✓ signature verified" pills + overall verification banner;
+     honest red "VERIFICATION FAILED" on tamper
+   - ✅ `ui/index.html` — dashboard link card + live case count
+   - ✅ Testing: 12 new tests (`tests/test_cases_dashboard.py`); 325 total pass / 8 skip
+   - ✅ Verified live: API backend=JSONLCaseStore, 19 cases; 3 freshly-signed demo cases
+     verify end-to-end; browser render confirmed via preview snapshot
+   - **Key property:** `PERSISTENCE_MODE=mongodb` swaps the backend with ZERO endpoint or
+     UI changes — the dashboard demonstrates the CaseStore abstraction's payoff
+   - **Commit:** `d5f9232` (2026-06-04)
+
+**⏭️ NEXT (optional, pilot-gated):**
+4. **Live MongoDB cutover** — only when pilot hits 50+ concurrent nurses or 100+ cases/day.
+   Set `PERSISTENCE_MODE=mongodb` + `MONGODB_URI`; run `ops/export_signed_cases.py` nightly.
+   Until then JSONL + CLI/dashboard verification is sufficient.
 
 **Supporting decisions:**
 - A4 (JWS signatures) is back in scope; 2026-05-31 removal is reversed (see SCOPE_DELTAS entry 2026-06-04)
