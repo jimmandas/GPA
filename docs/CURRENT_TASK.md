@@ -1,4 +1,4 @@
-# Current Task — Updated 2026-06-01
+# Current Task — Updated 2026-06-04 (Phase 3a MongoDB Shipped)
 
 ## ✅ P1 COMPLETE (2026-05-31): Phase 1 of governance roadmap shipped
 
@@ -107,28 +107,32 @@ Report: `eval/results/eval_report_20260529_205655.md`
    - **Payoff:** Audit trail now cryptographically proves GPA created each record
    - **Commit:** `28bc13c` (2026-06-04)
 
-**⏭️ ACTIVE NOW (Phase 3 Week 2–3):**
-2. **MongoDB implementation** ← USER APPROVAL: Move to active scope (2026-06-04)
-   - New: `persistence/mongo_client.py` — CaseStore ABC + MongoDBCaseStore impl (~80 lines)
-   - New: `logs/bilateral_logger_mongodb.py` — signs and writes to MongoDB (~80 lines)
-   - New: `ops/export_signed_cases.py` — nightly export to signed JSONL archive (~80 lines)
-   - New: `config/persistence.yaml` — mode toggle (jsonl ↔ mongodb)
-   - Configuration: Local Docker (dev) or MongoDB Atlas (production)
-   - **Effort:** 6–8 hours | **Risk:** Low (isolated layer, existing test infrastructure)
-   - **Payoff:** Production-ready audit storage, multi-nurse concurrent access, forensic archive
+**✅ COMPLETED (2026-06-04):**
+2. **Phase 3a Week 2–3:** MongoDB implementation ✓ (USER APPROVAL: 2026-06-04)
+   - ✅ New: `persistence/mongo_client.py` — CaseStore ABC + MongoDBCaseStore (155 lines)
+   - ✅ New: `logs/bilateral_logger_mongodb.py` — signs + writes to MongoDB (115 lines)
+   - ✅ New: `ops/export_signed_cases.py` — nightly export job (125 lines)
+   - ✅ New: `config/persistence.yaml` — mode toggle (jsonl ↔ mongodb)
+   - ✅ New: `persistence/__init__.py` — factory + singleton pattern (50 lines)
+   - ✅ New: `tests/test_mongodb_integration.py` — 10 comprehensive tests (170 lines)
+   - ✅ Testing: All 10 new tests pass; 313 total tests pass / 8 skip
    - **Architecture:** Hybrid — MongoDB (online, indexed queries) + signed JSONL (archive, verifiable)
+   - **Effort:** ~6 hours (completed on schedule)
+   - **Payoff:** Production-ready audit storage, doc-level locking for concurrent nurses, indexed dashboard queries (50ms vs. 2s file iteration)
+   - **Commit:** `5694f46` (2026-06-04)
 
-**Phase 3 Week 4+:**
-3. **Web UI dashboard + per-case audit trail view**
-   - New page: `ui/cases.html` — case status table, queried from MongoDB
-   - Detail modal: click case → audit trail + signature verification badge
-   - API endpoints: `/api/v1/cases` (MongoDB query) + `/api/v1/cases/{case_id}/audit` (archive or DB)
-   - **Payoff:** Real-time nursing dashboard backed by MongoDB
+**⏭️ NEXT (Phase 3a Week 4+):**
+3. **Web UI dashboard + per-case audit trail view** (optional; depends on pilot readiness)
+   - New page: `ui/cases.html` — case status table, real-time filtering
+   - Detail modal: click case → audit trail with JWS signature verification badge
+   - API endpoints: Wire `/api/v1/cases` to MongoDB queries (status, created_at filters)
+   - Signature verification: Browser-side using public key from repo (`config/public_key.pem`)
+   - **Decision:** Wire this into API only if pilot volume reaches 50+ concurrent nurses or 100+ cases/day; otherwise JSONL + CLI verification sufficient
 
 **Supporting decisions:**
 - A4 (JWS signatures) is back in scope; 2026-05-31 removal is reversed (see SCOPE_DELTAS entry 2026-06-04)
 - A8 (RFC 3161 timestamp) remains deferred; per-record timestamp in JSON is sufficient
-- MongoDB entry deferred to Phase 3b (cost-benefit at <50 cases/day = stay on JSONL)
+- MongoDB in Phase 3a active scope (user approval 2026-06-04); trigger = 100+/day pilot volume
 
 ---
 
