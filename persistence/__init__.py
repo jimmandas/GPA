@@ -14,7 +14,8 @@ import os
 import pathlib
 from typing import Optional
 
-from .mongo_client import CaseStore, MongoDBCaseStore, JSONLCaseStore
+from .mongo_client import CaseStore, MongoDBCaseStore
+from .jsonl_store import JSONLCaseStore
 
 _case_store: Optional[CaseStore] = None
 

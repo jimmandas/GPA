@@ -155,6 +155,13 @@ class MongoDBCaseStore(CaseStore):
             {"records": 0}  # Exclude full record history
         )
 
+    def list_all(self, limit: int = 200) -> List[dict]:
+        """Return summaries for every case (newest first). Dashboard convenience."""
+        cursor = self.cases.find({}, {"records": 0}).sort("updated_at", -1)
+        if limit is not None:
+            cursor = cursor.limit(limit)
+        return list(cursor)
+
     def mark_exported(self, case_id: str) -> None:
         """Mark a case as exported to the signed JSONL archive."""
         self.cases.update_one(
@@ -165,32 +172,3 @@ class MongoDBCaseStore(CaseStore):
     def close(self) -> None:
         """Close MongoDB connection."""
         self.client.close()
-
-
-class JSONLCaseStore(CaseStore):
-    """
-    Fallback JSONL-based case storage (Phase 3a default).
-
-    This is a minimal shim to support persistence factory mode toggling.
-    Full JSONL implementation lives in bilateral_logger.py (write-before-emit).
-    """
-
-    def __init__(self, log_dir):
-        self.log_dir = log_dir
-
-    def append_record(self, case_id: str, record: dict) -> None:
-        """Not implemented; bilateral_logger handles JSONL writes."""
-        raise NotImplementedError("JSONL writes happen via bilateral_logger.commit()")
-
-    def get_case_records(self, case_id: str) -> List[dict]:
-        """Stub for factory pattern compatibility."""
-        raise NotImplementedError("Use bilateral_logger for JSONL reads")
-
-    def find_by_status(self, status: str, limit: int = 100) -> List[dict]:
-        raise NotImplementedError("JSONL queries not yet implemented")
-
-    def get_case_summary(self, case_id: str) -> Optional[dict]:
-        raise NotImplementedError("JSONL summary not implemented")
-
-    def mark_exported(self, case_id: str) -> None:
-        raise NotImplementedError("JSONL export not yet implemented")

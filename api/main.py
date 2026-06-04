@@ -579,6 +579,79 @@ def list_audit_cases():
     return {"total": len(cases), "cases": cases}
 
 
+# ---------------------------------------------------------------------------
+# Case dashboard endpoints (Phase 3a — backend-agnostic via CaseStore)
+#
+# These go through persistence.get_case_store() so the SAME UI works whether
+# the backend is JSONL (default) or MongoDB (PERSISTENCE_MODE=mongodb). The
+# audit endpoint additionally runs chain + JWS signature verification so the
+# dashboard can render a per-record "signature verified" badge.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/cases")
+def list_cases(status: str | None = None, limit: int = 200):
+    """List case summaries via the active CaseStore backend.
+
+    Optional ?status= filter (pending_review|approved|escalated|pended).
+    Backend is selected by PERSISTENCE_MODE (jsonl default | mongodb).
+    """
+    from persistence import get_case_store
+    store = get_case_store()
+    backend = type(store).__name__
+    if status:
+        cases = store.find_by_status(status, limit=limit)
+    else:
+        cases = store.list_all(limit=limit)
+    # MongoDB docs carry a non-JSON-serializable _id; drop it.
+    for c in cases:
+        c.pop("_id", None)
+    return {"backend": backend, "total": len(cases), "cases": cases}
+
+
+@app.get("/api/v1/cases/{case_id}/audit")
+def get_case_audit(case_id: str):
+    """Return a case's audit trail with chain + signature verification.
+
+    Each record is annotated with `signature_verified` (true|false|null).
+    `chain_verified` is the overall verdict — the same proof verify_audit_log.py
+    produces, computed in-memory so it works for both JSONL and MongoDB backends.
+    """
+    from persistence import get_case_store
+    from verify_audit_log import verify_records
+
+    store = get_case_store()
+    backend = type(store).__name__
+    records = store.get_case_records(case_id)
+    if not records:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No audit records for case {case_id!r}",
+        )
+
+    chain_ok, message, sig_status = verify_records(records)
+
+    annotated = []
+    for rec, sig in zip(records, sig_status):
+        out = dict(rec)
+        out.pop("_id", None)
+        out["signature_verified"] = sig
+        annotated.append(out)
+
+    summary = store.get_case_summary(case_id) or {}
+    summary.pop("_id", None)
+
+    return {
+        "case_id": case_id,
+        "backend": backend,
+        "status": summary.get("status"),
+        "record_count": len(records),
+        "chain_verified": chain_ok,
+        "chain_message": message,
+        "signatures_present": any(s is not None for s in sig_status),
+        "records": annotated,
+    }
+
+
 @app.get("/api/v1/audit/case/{case_id}")
 def get_audit_case(case_id: str):
     """Return the bilateral log events for a single case, newest first."""

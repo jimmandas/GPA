@@ -331,6 +331,25 @@
     </div>
   </div>
 
+  <!-- Case Status Dashboard -->
+  <div class="row">
+    <div class="card">
+      <h2>Case Status Dashboard</h2>
+      <p class="desc">
+        Live case status from the active storage backend (JSONL by default,
+        MongoDB in production). Filter by status, then click any case to verify
+        its audit trail — hash chain + per-record JWS signature, checked against
+        the public key in the repo. The same view works on either backend.
+      </p>
+      <div class="stat-row">
+        <div class="stat">Cases logged<strong id="dashboard-case-count">—</strong></div>
+      </div>
+      <div class="actions">
+        <a href="cases.html" class="btn primary">Open case dashboard →</a>
+      </div>
+    </div>
+  </div>
+
   <!-- Eval Report — v3, bucket-grouped -->
   <div class="row">
     <div class="card">
@@ -422,6 +441,17 @@
       const d = await r.json();
       pill(`${d.total} audit log entries`, "muted");
     } catch (err) {}
+
+    // Case status dashboard count
+    try {
+      const r = await fetch(`${API_BASE}/api/v1/cases`);
+      const d = await r.json();
+      const el = document.getElementById("dashboard-case-count");
+      if (el) el.textContent = d.total ?? "—";
+    } catch (err) {
+      const el = document.getElementById("dashboard-case-count");
+      if (el) el.textContent = "—";
+    }
 
     // Eval framework version
     pill("Eval v3 (18 dims, 3-bucket framing)", "info");
