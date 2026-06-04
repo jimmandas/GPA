@@ -117,7 +117,18 @@ def score_source_citation_accuracy(reasoning_brief: dict) -> DimensionScore:
         if ref and ref in ALLOWED_SOURCE_REFS:
             valid += 1
 
-    score = 1.0 if total == 0 else valid / total
+    if total == 0:
+        # No claims to evaluate — return N/A.
+        return DimensionScore(
+            dimension="source_citation_accuracy",
+            score=None,
+            target=">=0.90",
+            passed=None,
+            notes="No claims to evaluate (no data for scoring)",
+            bucket=BUCKET_TRUST,
+        )
+
+    score = valid / total
     return DimensionScore(
         dimension="source_citation_accuracy",
         score=score,
@@ -180,10 +191,10 @@ def score_rationale_faithfulness(
     if reasoning_brief is None or not reasoning_brief.get("supporting_evidence"):
         return DimensionScore(
             dimension="rationale_faithfulness",
-            score=1.0,
+            score=None,
             target=">=0.80",
-            passed=True,
-            notes="No supporting_evidence claims to judge (vacuously faithful).",
+            passed=None,
+            notes="No claims to evaluate (no data for scoring)",
             bucket=BUCKET_TRUST,
         )
 

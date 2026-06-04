@@ -89,6 +89,41 @@ Report: `eval/results/eval_report_20260529_205655.md`
 
 ---
 
+## What's next (Phase 3a: Case Status UI + Audit Trail)
+
+### 🎯 **NEW PRIORITY (2026-06-04): Phase 3a—Web UI for Case Status + Audit Trail View**
+
+**Goal:** Non-technical nursing staff can view case status, click into any case, inspect full audit trail with cryptographic proof of authenticity.
+
+**Work breakdown:**
+1. **Now (Phase 3 Week 1):** Add JWS signatures to JSONL audit records
+   - Implement: `bilateral_logger.py` + `_sign_record()` method (~20 lines)
+   - Key management: generate RSA keypair, store private key in gitignored `config/`, commit public key to repo (~30 lines)
+   - Verification: update `verify_audit_log.py` to validate signatures (~30 lines)
+   - Testing: 4 new test cases (sign, verify, tamper detection)
+   - **Effort:** 2–3 hours | **Risk:** Low
+   - **Payoff:** Audit trail is now cryptographically verifiable end-to-end
+
+2. **Phase 3 Week 2–3:** Extend web UI with case dashboard + audit modal
+   - New page: `ui/cases.html` — table of all cases (status, nurse, date, escalation flag)
+   - Detail modal: click case → full audit trail (JSONL records) + signature verification badge
+   - API endpoint: `/api/v1/cases` (list) + `/api/v1/cases/{case_id}/audit` (detail)
+   - Browser-side signature verification using `jose` library (npm)
+   - **Effort:** 4–6 hours | **Risk:** Low (straightforward UI work)
+   - **Payoff:** Audit trail is now user-accessible without CLI
+
+3. **Phase 3b/4 (scale inflection):** Migrate to MongoDB
+   - Trigger: when concurrent case volume hits 100+ and file locks become bottleneck
+   - Approach: MongoDB storage + nightly export to signed JSONL (best of both worlds)
+   - **Not starting now.** Will revisit when pilot data shows demand.
+
+**Supporting decisions:**
+- A4 (JWS signatures) is back in scope; 2026-05-31 removal is reversed (see SCOPE_DELTAS entry 2026-06-04)
+- A8 (RFC 3161 timestamp) remains deferred; per-record timestamp in JSON is sufficient
+- MongoDB entry deferred to Phase 3b (cost-benefit at <50 cases/day = stay on JSONL)
+
+---
+
 ## What's next (measurement + market motion, not build)
 
 1. **Marketing engagement** ✅ (materials ready 2026-06-01)

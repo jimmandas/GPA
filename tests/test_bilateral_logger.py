@@ -10,7 +10,12 @@ import os
 
 import pytest
 
-from logs.bilateral_logger import BilateralLogger, BilateralLoggerError
+from logs.bilateral_logger import BilateralLogger, BilateralLoggerError, GENESIS_PREV, _canonical_hash
+
+
+def record_without_chain(record: dict) -> dict:
+	"""Return a copy of record without the prev_record_hash and jws_signature fields (for comparison)."""
+	return {k: v for k, v in record.items() if k not in ("prev_record_hash", "jws_signature")}
 
 
 # ---------------------------------------------------------------------------
@@ -31,7 +36,8 @@ def test_commit_happy_path(tmp_path):
     assert len(lines) == 1, f"expected 1 line, got {len(lines)}"
 
     parsed = json.loads(lines[0])
-    assert parsed == {"type": "test", "x": 1}
+    assert record_without_chain(parsed) == {"type": "test", "x": 1}
+    assert parsed["prev_record_hash"] == GENESIS_PREV, "first record should have genesis hash"
 
     # No failure should have been written.
     assert not failures_file.exists(), "failures.jsonl must not exist on happy path"
@@ -54,9 +60,15 @@ def test_commit_appends_multiple_records(tmp_path):
     lines = log_file.read_text().splitlines()
     assert len(lines) == 3, f"expected 3 lines, got {len(lines)}"
 
-    for i, line in enumerate(lines):
-        parsed = json.loads(line)
-        assert parsed == payloads[i], f"line {i} mismatch: {parsed!r}"
+    parsed_records = [json.loads(line) for line in lines]
+    for i, parsed in enumerate(parsed_records):
+        assert record_without_chain(parsed) == payloads[i], f"line {i} mismatch: {parsed!r}"
+
+    # Verify hash chain: each record's prev_record_hash matches hash of previous.
+    assert parsed_records[0]["prev_record_hash"] == GENESIS_PREV
+    for i in range(1, len(parsed_records)):
+        expected_prev_hash = _canonical_hash(parsed_records[i - 1])
+        assert parsed_records[i]["prev_record_hash"] == expected_prev_hash, f"line {i} chain broken"
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +86,8 @@ def test_commit_creates_log_dir(tmp_path):
     log_file = log_dir / "case_create.jsonl"
     assert log_file.exists()
     parsed = json.loads(log_file.read_text().strip())
-    assert parsed == {"type": "dir_creation_test"}
+    assert record_without_chain(parsed) == {"type": "dir_creation_test"}
+    assert parsed["prev_record_hash"] == GENESIS_PREV
 
 
 # ---------------------------------------------------------------------------
@@ -154,8 +167,12 @@ def test_no_cross_case_contamination(tmp_path):
 
     assert len(lines_a) == 1
     assert len(lines_b) == 1
-    assert json.loads(lines_a[0]) == {"v": 1}
-    assert json.loads(lines_b[0]) == {"v": 2}
+    parsed_a = json.loads(lines_a[0])
+    parsed_b = json.loads(lines_b[0])
+    assert record_without_chain(parsed_a) == {"v": 1}
+    assert record_without_chain(parsed_b) == {"v": 2}
+    assert parsed_a["prev_record_hash"] == GENESIS_PREV
+    assert parsed_b["prev_record_hash"] == GENESIS_PREV
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +191,69 @@ def test_concurrent_commits_same_case(tmp_path):
     lines = log_file.read_text().splitlines()
     assert len(lines) == 5, f"expected 5 lines, got {len(lines)}"
 
-    for i, line in enumerate(lines):
-        parsed = json.loads(line)
-        assert parsed == {"i": i}, f"line {i} mismatch: {parsed!r}"
+    parsed_records = [json.loads(line) for line in lines]
+    for i, parsed in enumerate(parsed_records):
+        assert record_without_chain(parsed) == {"i": i}, f"line {i} mismatch: {parsed!r}"
+
+    # Verify hash chain.
+    assert parsed_records[0]["prev_record_hash"] == GENESIS_PREV
+    for i in range(1, len(parsed_records)):
+        expected_prev_hash = _canonical_hash(parsed_records[i - 1])
+        assert parsed_records[i]["prev_record_hash"] == expected_prev_hash, f"line {i} chain broken"
+
+
+# ---------------------------------------------------------------------------
+# test_hash_chain_tampering_detection — audit drill
+# ---------------------------------------------------------------------------
+
+def test_hash_chain_tampering_detection(tmp_path):
+	"""Verify that hash chain catches tampering (mutation, reordering, deletion)."""
+	from logs.bilateral_logger import _canonical_hash, GENESIS_PREV
+
+	log_dir = tmp_path / "logs"
+	failures_file = tmp_path / "failures.jsonl"
+	logger = BilateralLogger(log_dir, failures_file)
+
+	# (a) Create a clean chain.
+	logger.commit("case_tamper", {"type": "record", "seq": 1})
+	logger.commit("case_tamper", {"type": "record", "seq": 2})
+	logger.commit("case_tamper", {"type": "record", "seq": 3})
+
+	log_file = log_dir / "case_tamper.jsonl"
+	original_lines = log_file.read_text().splitlines()
+	assert len(original_lines) == 3
+
+	# Verify clean chain is valid.
+	from verify_audit_log import verify_audit_log as verify
+	is_valid, msg = verify(log_file)
+	assert is_valid, f"clean chain should be valid: {msg}"
+
+	# (b) Mutate a record's content (not the hash).
+	lines = log_file.read_text().splitlines()
+	records = [json.loads(line) for line in lines]
+	records[1]["seq"] = 999  # Mutate the second record.
+	with log_file.open("w", encoding="utf-8") as f:
+		for r in records:
+			f.write(json.dumps(r, separators=(",", ":")) + "\n")
+
+	is_valid, msg = verify(log_file)
+	assert not is_valid, f"mutated content should be detected: {msg}"
+	# Signature verification will catch tampering first (stricter than hash chain alone)
+	assert "hash chain broken" in msg or "hash" in msg.lower() or "signature" in msg.lower(), \
+		f"message should mention tampering detection (hash chain or signature): {msg}"
+
+	# (c) Restore clean chain; now mutate the prev_record_hash.
+	with log_file.open("w", encoding="utf-8") as f:
+		for line in original_lines:
+			f.write(line + "\n")
+
+	lines = log_file.read_text().splitlines()
+	records = [json.loads(line) for line in lines]
+	records[1]["prev_record_hash"] = "sha256:" + "f" * 64  # Corrupt the hash.
+	with log_file.open("w", encoding="utf-8") as f:
+		for r in records:
+			f.write(json.dumps(r, separators=(",", ":")) + "\n")
+
+	is_valid, msg = verify(log_file)
+	assert not is_valid, f"corrupted hash should be detected: {msg}"
+	assert "hash chain broken" in msg, f"message should mention chain break: {msg}"

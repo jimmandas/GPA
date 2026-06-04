@@ -29,3 +29,6 @@ physician_queue/state.json.tmp
 .env
 .env.*
 !.env.example
+
+# JWS signing keys (private key only; public key is committed)
+config/private_key.pem

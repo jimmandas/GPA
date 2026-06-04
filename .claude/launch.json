@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gpa-api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /Users/lauramandas/claude/projects/GPA && PYTHONPATH=. .spike-venv/bin/uvicorn api.main:app --port 8000 --reload"],
+      "port": 8000
+    },
+    {
+      "name": "gpa-ui",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8001", "--directory", "/Users/lauramandas/claude/projects/GPA/ui"],
+      "port": 8001,
+      "autoPort": false
+    }
+  ]
+}

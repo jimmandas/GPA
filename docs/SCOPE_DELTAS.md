@@ -16,6 +16,72 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
+### scope-addition: Phase 3a—Case Status Web UI + Audit Trail View + JWS Signatures — 2026-06-04
+
+- **Date logged:** 2026-06-04
+- **Decision:** User approved new Phase 3a scope goal (Jim, 2026-06-04): *"Add ability to view case status via web UI, audit trail per case. Supporting scope: add signatures, add MongoDB (deferred to Phase 3b/4)."*
+- **What's being added:**
+  - **Phase 3a goal:** Web UI dashboard showing case status (pending, in review, completed, escalated) with real-time queue visibility for nurses and physicians
+  - **Per-case audit trail view:** Click into any case to inspect the full decision_log JSONL with signature verification in the browser
+  - **Supporting infrastructure Priority 1 (do now):** JWS signatures on all JSONL records + `verify_audit_log.py` upgrade to validate signatures cryptographically
+  - **Supporting infrastructure Priority 2 (Phase 3b/4):** MongoDB migration when concurrent case volume hits 100+ (trigger: file locks become bottleneck)
+
+- **Why this matters:**
+  - **Current state:** Audit trails are JSONL files + hash chains; only developers can inspect manually with CLI tools
+  - **Phase 3a goal:** Non-technical nursing staff can click into a case in the web UI and see full decision history with cryptographic proof of authenticity (via JWS signature verification in the browser)
+  - **Admissibility win:** Combining signatures + web UI = "anyone can independently verify the audit trail is authentic"
+  - **Scaling path:** File-based storage works up to ~50 cases/day; MongoDB enters at Phase 3b when concurrent demand justifies the operational overhead
+
+- **Implementation phases:**
+  1. **Now (Phase 3 Week 1):** Add JWS signing to `bilateral_logger.py`; update `verify_audit_log.py` to check signatures; wire up key generation
+  2. **Phase 3 Week 2-3:** Extend web UI (`ui/index.html`) with case status dashboard + per-case detail modal showing audit trail
+  3. **Phase 3b (scale inflection):** When concurrent cases hit 100+, migrate to MongoDB while preserving signature chain
+
+- **Scope boundaries (NOT included):**
+  - NOT full clinical-audit export (HIPAA HITRUST compliance) — Phase 3+ regulatory track
+  - NOT multi-tenancy or RBAC — single-tenant pilot scope (Phase 4)
+  - NOT Opus/ship-tier eval on signatures — dev-tier Sonnet eval covers signature correctness
+
+- **Reversals / Amendments:**
+  - **Amends 2026-05-31 A4 removal:** That entry removed A4 (HMAC/signature) to avoid key-management costs. This decision reverses that — JWS adds ~2-3 hours of dev work, zero AWS costs (keys stored locally in gitignored config), and unlocks the admissibility + web UI story. A4's original "key-management cost" concern is moot.
+  - **A8 (RFC 3161 timestamp):** Still deferred. JWS + per-case timestamp in the JSON is sufficient for admissibility; RFC 3161 TSA integration is higher-touch and not required for Phase 3a.
+
+- **Traceability:**
+  - New ADR forthcoming: `ADR-020-JWS-signatures-JSONL-audit-trail`
+  - Existing ADR-017 (EVAL_TIER) + ADR-014 (PhysicianQueue) remain unchanged
+  - Tests needed: signature generation, signature verification, tampered-record detection
+
+- **Risk / Unknowns:**
+  - MongoDB migration timing (Phase 3b): depends on actual concurrent case volume in pilot; if pilot volume stays <50/day, MongoDB can be further deferred to Phase 4
+  - Browser-based signature verification: need to pick JWS library (e.g., `jose` npm package for the UI); add dependency
+
+- **Backout / Rollback:** Straightforward. If signatures cause issues before Phase 3a ships, remove the signature field from JSONL and omit signature verification in `verify_audit_log.py`. The hash chain remains intact; admissibility story survives with hash-chain alone (pre-2026-06-04 status).
+
+---
+
+### scope-removal: A4 (HMAC/signature) + A8 (RFC 3161 timestamp) — 2026-05-31
+
+- **Date logged:** 2026-05-31
+- **Decision:** User removed from scope (Jim, 2026-05-31): *"I don't want to spend any money. Let's remove this item from the Scope list."*
+- **What was named:** P2 phase — **A4** (HMAC/digital signature on audit records) and **A8** (RFC 3161 trusted timestamping). Both depended on key-management decision (where/how to store cryptographic keys).
+- **Why removed:**
+  - **Key management cost not budgeted.** AWS KMS estimate was ~$2–4/month for MVP, negligible but beyond current budget constraints.
+  - **O1 (Admissibility) remains defensible without them.** A1 (hash-chain) + A2 (complete audit trail) + A3 (fail-closed HITL) + A7 (chain-of-custody legal doc) is sufficient for regulated-tenant auditability. A4/A8 add non-repudiation and timestamping (nice-to-have, not critical-path).
+  - **A4 + A8 were lowest GIST priority.** A4: 280 (Ease docked by key-mgmt blocker). A8: 180 (lowest on board). A1 was 729; A7 is 336. The core governance spine doesn't depend on signatures or timestamps.
+  - **Key-management decision is off-repo.** No control over when it lands; better to remove the items than be blocked.
+- **Impact on P2:**
+  - **A7 (chain-of-custody doc)** unblocked: was blocked by A4 + legal review; now blocked by A1 ✅ + legal review only.
+  - **R7 (transparency cards)** shipped ✅ regardless; pairs with R10, not A4/A8.
+  - **P2 remaining items:** A7 + R7. Both move forward without key-mgmt decision.
+- **Impact on O1 (Admissibility) claim:**
+  - **Before removal:** "Records are authentic (A4 signature), complete (A2), untampered (A1), HITL-verified (A3), timestamped (A8), legally framed (A7)"
+  - **After removal:** "Records are complete (A2), untampered (A1), HITL-verified (A3), legally framed (A7)" — still sufficient for regulator verification without vendor trust.
+  - **Regulator can independently verify:** Run `verify_audit_log.py` on any case → chain integrity. Query audit trail → full decision trail. Check A3 fail-closed enforcement → HITL guarantee. A1+A2+A3+A7 is the defensible core.
+- **Where they go:** Not Phase 3 backlog. Out-of-scope (deferred indefinitely pending key-mgmt decision + budget).
+- **Backout:** None needed; A4/A8 were never in code (blocked on external decision). Removal affects docs only.
+
+---
+
 ### scope-clarification: per-case dims rolled up into bucket view (Fix B) — 2026-05-28
 
 - **Date logged:** 2026-05-28

@@ -11,6 +11,7 @@ Entry point: run_pipeline(submission: dict) -> dict
 
 import asyncio
 import json
+import os
 import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass
@@ -71,22 +72,30 @@ def _build_pre_state_record(case_id, submission, findings, context, policy_map, 
         "context_hash": _sha256(json.dumps(context, sort_keys=True, separators=(',', ':'))),
         "policy_map_hash": _sha256(json.dumps(policy_map, sort_keys=True, separators=(',', ':'))),
         "reasoning_brief_hash": _sha256(json.dumps(reasoning_brief, sort_keys=True, separators=(',', ':'))),
+        "denial_gate_mode": os.environ.get("DENIAL_GATE_MODE", "block"),
         "at": _now_iso(),
     }
 
 
 def _log_escalation(case_id: str, reason: str, detail) -> None:
-    record = {
-        "type": "escalation_event",
-        "case_id": case_id,
-        "reason": reason,
-        "detail": str(detail),
-        "at": _now_iso(),
-    }
-    try:
-        get_logger().commit(case_id, record)
-    except BilateralLoggerError:
-        pass  # best-effort on escalation logging
+	"""
+	Log an escalation event to the bilateral audit logger.
+
+	Escalation logs are critical to the HITL pipeline. If the audit log write
+	fails, this raises BilateralLoggerError so the caller (gate) can decide
+	whether to fail-closed or retry. No silent failures.
+
+	Raises:
+		BilateralLoggerError: if the audit log write fails
+	"""
+	record = {
+		"type": "escalation_event",
+		"case_id": case_id,
+		"reason": reason,
+		"detail": str(detail),
+		"at": _now_iso(),
+	}
+	get_logger().commit(case_id, record)
 
 
 # ---------------------------------------------------------------------------
@@ -153,12 +162,17 @@ async def _run_async(submission: dict) -> PipelineResult:
         # on a case the system has declared low-confidence. ADR-015.
         conf_result = check_confidence(policy_map)
         if not conf_result.passed:
-            _log_escalation(case_id, "confidence_gate_failed", {
-                "signal": conf_result.signal,
-                "ambiguous_or_unmet_count": conf_result.ambiguous_or_unmet_count,
-                "threshold": conf_result.threshold,
-                "violations": conf_result.violations,
-            })
+            try:
+                _log_escalation(case_id, "confidence_gate_failed", {
+                    "signal": conf_result.signal,
+                    "ambiguous_or_unmet_count": conf_result.ambiguous_or_unmet_count,
+                    "threshold": conf_result.threshold,
+                    "violations": conf_result.violations,
+                })
+            except BilateralLoggerError:
+                # Escalation logging failed — audit trail integrity is at risk.
+                # Fail-closed: propagate the error, do not emit a partial determination.
+                raise
             return PipelineResult(
                 case_id=case_id,
                 status="escalated",
@@ -175,7 +189,12 @@ async def _run_async(submission: dict) -> PipelineResult:
         # STEP 7 — Source Verification Gate
         sv_result = verify(reasoning_brief)
         if not sv_result.passed:
-            _log_escalation(case_id, "source_verification_failed", sv_result.violations)
+            try:
+                _log_escalation(case_id, "source_verification_failed", sv_result.violations)
+            except BilateralLoggerError:
+                # Escalation logging failed — audit trail integrity is at risk.
+                # Fail-closed: propagate the error, do not emit a partial determination.
+                raise
             return PipelineResult(
                 case_id=case_id,
                 status="escalated",
@@ -275,6 +294,7 @@ def record_nurse_decision(
         "type": "nurse_action_record",
         "case_id": case_id,
         "nurse_decision": action,
+        "denial_gate_mode": os.environ.get("DENIAL_GATE_MODE", "block"),
         "rationale": rationale,
         "at": _now_iso(),
     }
@@ -285,29 +305,49 @@ def record_nurse_decision(
     # if the case is already pending on the queue, we silently skip (avoids
     # double-enqueue when a nurse hits escalate twice).
     if action == "escalate":
+        if physician_queue is None:
+            from physician_queue import get_queue
+            physician_queue = get_queue()
+        from physician_queue import FilePhysicianQueueError
         try:
-            if physician_queue is None:
-                from physician_queue import get_queue
-                physician_queue = get_queue()
-            from physician_queue import FilePhysicianQueueError
+            physician_queue.enqueue(
+                case_id=case_id,
+                reason="nurse_escalated",
+                nurse_note=rationale,
+            )
+        except FilePhysicianQueueError as exc:
+            # duplicate_pending is the only expected error here — case is
+            # already on the queue from a prior escalation. Safe to skip.
+            if getattr(exc, "reason", "") == "duplicate_pending":
+                pass  # silently skip; case already queued
+            else:
+                # Unexpected physician-queue error. Audit to system_failures and re-raise.
+                failure_record = {
+                    "type": "physician_enqueue_error",
+                    "case_id": case_id,
+                    "reason": getattr(exc, "reason", "unknown"),
+                    "detail": str(exc),
+                    "at": _now_iso(),
+                }
+                try:
+                    get_logger().commit(case_id, failure_record)
+                except BilateralLoggerError:
+                    pass  # audit failure, but we still need to raise the original error
+                raise
+        except Exception as exc:
+            # Non-queue errors (e.g., file system, permissions). Audit and fail-closed.
+            failure_record = {
+                "type": "physician_enqueue_error",
+                "case_id": case_id,
+                "reason": "unexpected_error",
+                "detail": str(exc),
+                "at": _now_iso(),
+            }
             try:
-                physician_queue.enqueue(
-                    case_id=case_id,
-                    reason="nurse_escalated",
-                    nurse_note=rationale,
-                )
-            except FilePhysicianQueueError as exc:
-                # duplicate_pending is the only expected error here — case is
-                # already on the queue from a prior escalation. Safe to skip.
-                if getattr(exc, "reason", "") != "duplicate_pending":
-                    raise
-        except Exception:
-            # We do NOT want a physician-queue write failure to block the nurse
-            # action from emitting — the nurse's decision is already in the
-            # bilateral log (write-before-emit honored). Log the failure path
-            # via the system_failures.jsonl convention; do not raise.
-            import traceback
-            traceback.print_exc()
+                get_logger().commit(case_id, failure_record)
+            except BilateralLoggerError:
+                pass  # audit failure, but we still need to raise the original error
+            raise
 
     determination = {
         "case_id": case_id,

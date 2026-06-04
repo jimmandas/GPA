@@ -88,8 +88,8 @@ def test_source_citation_accuracy_partial():
 
 def test_source_citation_accuracy_empty():
     result = score_source_citation_accuracy({"supporting_evidence": [], "uncertainty_flags": []})
-    assert result.score == 1.0
-    assert result.passed is True
+    assert result.score is None, "0 claims should return N/A, not vacuous 1.0"
+    assert result.passed is None, "0 claims should have no pass/fail status"
 
 
 # ---------------------------------------------------------------------------
@@ -263,12 +263,12 @@ def test_confidence_calibration_perfect():
 # ---------------------------------------------------------------------------
 
 def test_rationale_faithfulness_no_claims():
-    """No supporting_evidence → vacuously faithful, returns 1.0."""
+    """No supporting_evidence → return N/A, not vacuously faithful."""
     result = score_rationale_faithfulness(
         {"supporting_evidence": []}, {}, {}, {}
     )
-    assert result.score == 1.0
-    assert result.passed is True
+    assert result.score is None, "0 claims should return N/A, not vacuous 1.0"
+    assert result.passed is None, "0 claims should have no pass/fail status"
 
 
 # ---------------------------------------------------------------------------

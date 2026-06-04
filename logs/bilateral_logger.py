@@ -13,10 +13,31 @@ on both sides (process memory + durable storage) before the caller can
 treat the record as committed.
 """
 
+import hashlib
 import json
 import os
 import pathlib
+import base64
 from datetime import datetime, timezone
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.backends import default_backend
+
+
+# ---------------------------------------------------------------------------
+# Hash-chaining constants and helpers
+# ---------------------------------------------------------------------------
+
+GENESIS_PREV = "sha256:" + "0" * 64
+
+
+def _canonical_hash(record: dict) -> str:
+	"""
+	Compute SHA-256 hash of a record in canonical (sorted-key) form.
+	Used for hash-chaining to detect tampering.
+	"""
+	canonical = json.dumps(record, sort_keys=True, separators=(",", ":"))
+	return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -49,10 +70,15 @@ class BilateralLogger:
         self._failures_file = failures_file
         # Eagerly create the log directory.
         self._log_dir.mkdir(parents=True, exist_ok=True)
+        # Load private key for JWS signatures (lazy-loaded on first use)
+        self._private_key = None
 
     def commit(self, case_id: str, record: dict) -> None:
         """
         Append record to log_dir/{case_id}.jsonl and fsync.
+
+        Each record includes prev_record_hash for cryptographic hash-chaining
+        to detect tampering (mutation, reordering, deletion).
 
         Raises:
             BilateralLoggerError: if fsync fails. The partial write is
@@ -62,7 +88,30 @@ class BilateralLogger:
         self._log_dir.mkdir(parents=True, exist_ok=True)
 
         log_path = self._log_dir / f"{case_id}.jsonl"
-        line = json.dumps(record, separators=(",", ":")) + "\n"
+
+        # Compute hash of the previous record (if it exists) to chain to.
+        prev_hash = GENESIS_PREV
+        if log_path.exists():
+            with log_path.open("r", encoding="utf-8") as f:
+                lines = f.readlines()
+                if lines:
+                    last_line = lines[-1].strip()
+                    if last_line:
+                        try:
+                            last_record = json.loads(last_line)
+                            prev_hash = _canonical_hash(last_record)
+                        except (json.JSONDecodeError, ValueError):
+                            # If the last record is corrupted, treat it as genesis.
+                            prev_hash = GENESIS_PREV
+
+        # Create a copy of the record to avoid mutating the caller's object.
+        record_with_chain = dict(record)
+        record_with_chain["prev_record_hash"] = prev_hash
+
+        # Sign the record with JWS signature (computed over canonical JSON with hash chain)
+        record_with_chain["jws_signature"] = self._sign_record(record_with_chain)
+
+        line = json.dumps(record_with_chain, separators=(",", ":")) + "\n"
 
         with log_path.open("a", encoding="utf-8") as f:
             # Capture position before writing so we can roll back on fsync failure.
@@ -85,6 +134,45 @@ class BilateralLogger:
                     reason="fsync_error",
                     detail=str(exc),
                 ) from exc
+
+    def _load_private_key(self):
+        """Load RSA private key from config/private_key.pem (lazy-loaded)."""
+        if self._private_key is not None:
+            return self._private_key
+
+        key_path = pathlib.Path(__file__).parent.parent / "config" / "private_key.pem"
+        if not key_path.exists():
+            # Auto-generate if missing
+            from config.key_generation import ensure_keys_exist
+            ensure_keys_exist(key_path.parent)
+
+        with key_path.open("rb") as f:
+            self._private_key = serialization.load_pem_private_key(
+                f.read(),
+                password=None,
+                backend=default_backend()
+            )
+        return self._private_key
+
+    def _sign_record(self, record: dict) -> str:
+        """
+        Sign record with RSA private key using PSS padding.
+        Returns base64-encoded signature.
+
+        The signature is computed over the canonical (sorted-key) JSON of the record
+        INCLUDING the prev_record_hash field.
+        """
+        private_key = self._load_private_key()
+        canonical = json.dumps(record, sort_keys=True, separators=(",", ":"))
+        signature_bytes = private_key.sign(
+            canonical.encode(),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return base64.b64encode(signature_bytes).decode('ascii')
 
     def _write_failure_record(self, case_id: str, detail: str) -> None:
         """Append a failure record to failures_file. Best-effort: never raises."""
