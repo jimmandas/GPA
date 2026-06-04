@@ -107,21 +107,23 @@ Report: `eval/results/eval_report_20260529_205655.md`
    - **Payoff:** Audit trail now cryptographically proves GPA created each record
    - **Commit:** `28bc13c` (2026-06-04)
 
-**⏭️ NEXT (Phase 3 Week 2–3):**
-2. **Web UI dashboard + per-case audit trail view**
-   - New page: `ui/cases.html` — table of all cases (status, nurse, date, escalation flag)
-   - Detail modal: click case → full audit trail (JSONL records) + signature verification badge
-   - API endpoint: `/api/v1/cases` (list) + `/api/v1/cases/{case_id}/audit` (detail)
-   - Browser-side signature verification using `jose` library (npm)
-   - **Effort:** 4–6 hours | **Risk:** Low (straightforward UI work)
-   - **Payoff:** Audit trail is now user-accessible without CLI
+**⏭️ ACTIVE NOW (Phase 3 Week 2–3):**
+2. **MongoDB implementation** ← USER APPROVAL: Move to active scope (2026-06-04)
+   - New: `persistence/mongo_client.py` — CaseStore ABC + MongoDBCaseStore impl (~80 lines)
+   - New: `logs/bilateral_logger_mongodb.py` — signs and writes to MongoDB (~80 lines)
+   - New: `ops/export_signed_cases.py` — nightly export to signed JSONL archive (~80 lines)
+   - New: `config/persistence.yaml` — mode toggle (jsonl ↔ mongodb)
+   - Configuration: Local Docker (dev) or MongoDB Atlas (production)
+   - **Effort:** 6–8 hours | **Risk:** Low (isolated layer, existing test infrastructure)
+   - **Payoff:** Production-ready audit storage, multi-nurse concurrent access, forensic archive
+   - **Architecture:** Hybrid — MongoDB (online, indexed queries) + signed JSONL (archive, verifiable)
 
-**Phase 3b/4 (Deferred, scale inflection):**
-3. **MongoDB migration** (when concurrent case volume hits 100+)
-   - Trigger: file locks become bottleneck, dashboard queries slow
-   - Approach: MongoDB storage + nightly export to signed JSONL (preserve forensic admissibility)
-   - **Architecture:** Hybrid JSONL + MongoDB (details in plan file and SCOPE_DELTAS)
-   - **Not starting now.** Will revisit when pilot data shows demand.
+**Phase 3 Week 4+:**
+3. **Web UI dashboard + per-case audit trail view**
+   - New page: `ui/cases.html` — case status table, queried from MongoDB
+   - Detail modal: click case → audit trail + signature verification badge
+   - API endpoints: `/api/v1/cases` (MongoDB query) + `/api/v1/cases/{case_id}/audit` (archive or DB)
+   - **Payoff:** Real-time nursing dashboard backed by MongoDB
 
 **Supporting decisions:**
 - A4 (JWS signatures) is back in scope; 2026-05-31 removal is reversed (see SCOPE_DELTAS entry 2026-06-04)

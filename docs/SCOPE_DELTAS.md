@@ -16,26 +16,34 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
-### scope-addition: Phase 3a—Case Status Web UI + Audit Trail View + JWS Signatures — 2026-06-04
+### scope-addition: Phase 3a—Case Status Web UI + Audit Trail View + JWS Signatures + MongoDB — 2026-06-04 (AMENDED 2026-06-04)
 
-- **Date logged:** 2026-06-04
-- **Decision:** User approved new Phase 3a scope goal (Jim, 2026-06-04): *"Add ability to view case status via web UI, audit trail per case. Supporting scope: add signatures, add MongoDB (deferred to Phase 3b/4)."*
+- **Date logged:** 2026-06-04 | **Amended:** 2026-06-04
+- **Decision:** User approved Phase 3a scope, later amended (Jim, 2026-06-04): *"Add MongoDB to active scope NOW (Phase 3a). Move from Phase 3b/4 deferral to immediate implementation."*
 - **What's being added:**
-  - **Phase 3a goal:** Web UI dashboard showing case status (pending, in review, completed, escalated) with real-time queue visibility for nurses and physicians
-  - **Per-case audit trail view:** Click into any case to inspect the full decision_log JSONL with signature verification in the browser
-  - **Supporting infrastructure Priority 1 (do now):** JWS signatures on all JSONL records + `verify_audit_log.py` upgrade to validate signatures cryptographically
-  - **Supporting infrastructure Priority 2 (Phase 3b/4):** MongoDB migration when concurrent case volume hits 100+ (trigger: file locks become bottleneck)
+  - **Phase 3a goal:** Web UI dashboard showing case status (pending, in review, completed, escalated) with real-time queue visibility
+  - **Per-case audit trail view:** Click into any case to inspect decision_log with JWS signature verification in browser
+  - **Supporting infrastructure Priority 1 (DONE ✓):** JWS signatures on JSONL records (2026-06-04 commit 28bc13c)
+  - **Supporting infrastructure Priority 2 (ACTIVE NOW):** MongoDB implementation for production-scale audit storage
+    - Hybrid architecture: MongoDB (online) + signed JSONL archive (forensic)
+    - Nightly export from MongoDB to signed JSONL archive
+    - No change to signature/hash-chain verification (preserved in archive)
 
 - **Why this matters:**
-  - **Current state:** Audit trails are JSONL files + hash chains; only developers can inspect manually with CLI tools
-  - **Phase 3a goal:** Non-technical nursing staff can click into a case in the web UI and see full decision history with cryptographic proof of authenticity (via JWS signature verification in the browser)
-  - **Admissibility win:** Combining signatures + web UI = "anyone can independently verify the audit trail is authentic"
-  - **Scaling path:** File-based storage works up to ~50 cases/day; MongoDB enters at Phase 3b when concurrent demand justifies the operational overhead
+  - **Current state (JSONL):** Works for pilot (50–200 cases/day); developers inspect via CLI
+  - **Phase 3a goal (Hybrid):** MongoDB online for real-time nursing dashboards + signed JSONL archive for forensic verification by auditors
+  - **Admissibility win:** Signatures + archive = "anyone can independently verify the audit trail is authentic" (offline, using public key)
+  - **Production readiness:** MongoDB enables multi-nurse concurrent access, indexed queries, automatic backups
+  - **Cost:** $0 (local Docker dev) or $50–200/mo (MongoDB Atlas cloud, production)
 
-- **Implementation phases:**
-  1. **Now (Phase 3 Week 1):** Add JWS signing to `bilateral_logger.py`; update `verify_audit_log.py` to check signatures; wire up key generation
-  2. **Phase 3 Week 2-3:** Extend web UI (`ui/index.html`) with case status dashboard + per-case detail modal showing audit trail
-  3. **Phase 3b (scale inflection):** When concurrent cases hit 100+, migrate to MongoDB while preserving signature chain
+- **Implementation phases (UPDATED):**
+  1. **Phase 3 Week 1 (DONE ✓):** JWS signatures on JSONL records (commit 28bc13c, 2026-06-04)
+  2. **Phase 3 Week 2-3 (NEXT):** MongoDB implementation
+     - `persistence/mongo_client.py` — CaseStore interface + MongoDBCaseStore implementation
+     - `logs/bilateral_logger_mongodb.py` — sign-and-write to MongoDB (mirrors JSONL behavior)
+     - `ops/export_signed_cases.py` — nightly batch job exporting completed cases to signed JSONL archive
+     - Dual-write fallback (write to both JSONL and MongoDB during transition)
+  3. **Phase 3 Week 4:** Web UI dashboard wired to MongoDB queries (real-time case status)
 
 - **Scope boundaries (NOT included):**
   - NOT full clinical-audit export (HIPAA HITRUST compliance) — Phase 3+ regulatory track
