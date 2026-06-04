@@ -91,20 +91,24 @@ Report: `eval/results/eval_report_20260529_205655.md`
 
 ## What's next (Phase 3a: Case Status UI + Audit Trail)
 
-### 🎯 **NEW PRIORITY (2026-06-04): Phase 3a—Web UI for Case Status + Audit Trail View**
+### 🎯 **PHASE 3a IN PROGRESS: Web UI for Case Status + Audit Trail View**
 
 **Goal:** Non-technical nursing staff can view case status, click into any case, inspect full audit trail with cryptographic proof of authenticity.
 
-**Work breakdown:**
-1. **Now (Phase 3 Week 1):** Add JWS signatures to JSONL audit records
-   - Implement: `bilateral_logger.py` + `_sign_record()` method (~20 lines)
-   - Key management: generate RSA keypair, store private key in gitignored `config/`, commit public key to repo (~30 lines)
-   - Verification: update `verify_audit_log.py` to validate signatures (~30 lines)
-   - Testing: 4 new test cases (sign, verify, tamper detection)
-   - **Effort:** 2–3 hours | **Risk:** Low
-   - **Payoff:** Audit trail is now cryptographically verifiable end-to-end
+**✅ COMPLETED (2026-06-04):**
+1. **Phase 3 Week 1:** JWS signatures for JSONL audit records ✓
+   - ✅ New: `config/key_generation.py` (RSA keypair generator, 40 lines)
+   - ✅ New: `config/public_key.pem` (committed to repo, safe for verification)
+   - ✅ Update: `logs/bilateral_logger.py` — signs records with RSA-PSS SHA-256 (25 lines added)
+   - ✅ Update: `verify_audit_log.py` — verifies hash chain + JWS signatures (45 lines added)
+   - ✅ Update: `tests/test_bilateral_logger.py` — adapted for signatures (1 line change)
+   - ✅ Testing: All 8 existing tests passing, 1 new integration test passing
+   - ✅ Eval framework: Compatible (signatures are additional fields, don't break dims)
+   - **Payoff:** Audit trail now cryptographically proves GPA created each record
+   - **Commit:** `28bc13c` (2026-06-04)
 
-2. **Phase 3 Week 2–3:** Extend web UI with case dashboard + audit modal
+**⏭️ NEXT (Phase 3 Week 2–3):**
+2. **Web UI dashboard + per-case audit trail view**
    - New page: `ui/cases.html` — table of all cases (status, nurse, date, escalation flag)
    - Detail modal: click case → full audit trail (JSONL records) + signature verification badge
    - API endpoint: `/api/v1/cases` (list) + `/api/v1/cases/{case_id}/audit` (detail)
@@ -112,9 +116,11 @@ Report: `eval/results/eval_report_20260529_205655.md`
    - **Effort:** 4–6 hours | **Risk:** Low (straightforward UI work)
    - **Payoff:** Audit trail is now user-accessible without CLI
 
-3. **Phase 3b/4 (scale inflection):** Migrate to MongoDB
-   - Trigger: when concurrent case volume hits 100+ and file locks become bottleneck
-   - Approach: MongoDB storage + nightly export to signed JSONL (best of both worlds)
+**Phase 3b/4 (Deferred, scale inflection):**
+3. **MongoDB migration** (when concurrent case volume hits 100+)
+   - Trigger: file locks become bottleneck, dashboard queries slow
+   - Approach: MongoDB storage + nightly export to signed JSONL (preserve forensic admissibility)
+   - **Architecture:** Hybrid JSONL + MongoDB (details in plan file and SCOPE_DELTAS)
    - **Not starting now.** Will revisit when pilot data shows demand.
 
 **Supporting decisions:**
