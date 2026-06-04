@@ -1,0 +1,14 @@
+persistence:
+  # Mode: "jsonl" (Phase 3a default) or "mongodb" (Phase 3b+)
+  mode: "jsonl"
+
+mongodb:
+  # Connection string (override with MONGODB_URI env var)
+  uri: ${MONGODB_URI:-mongodb://localhost:27017}
+  database: gpa_audit
+
+archive:
+  # Nightly export of completed cases to signed JSONL
+  enabled: true
+  export_schedule: "0 2 * * *"  # 2 AM UTC daily
+  archive_dir: ${REPO_ROOT:-/Users/lauramandas/claude/projects/GPA}/archive/
