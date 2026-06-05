@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Classifier Agent Output",
+  "description": "Structured cancer type, stage, ICD-10, therapy line, urgency classification from prior authorization submission.",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "description": "Copy of input case_id for audit trail."
+    },
+    "cancer_type": {
+      "type": "string",
+      "enum": [
+        "nsclc",
+        "sclc",
+        "mesothelioma",
+        "other_thoracic",
+        "breast",
+        "colorectal",
+        "melanoma",
+        "unknown"
+      ],
+      "description": "Classified cancer type."
+    },
+    "stage": {
+      "type": "string",
+      "description": "TNM descriptor (e.g., 'IIIA', 'T3N1M0') or 'unknown'."
+    },
+    "icd10_code": {
+      "type": ["string", "null"],
+      "description": "ICD-10 diagnosis code (C-series) if present, else null."
+    },
+    "therapy_line": {
+      "type": "string",
+      "enum": [
+        "first_line",
+        "second_line",
+        "adjuvant",
+        "neoadjuvant",
+        "maintenance",
+        "none",
+        "unknown"
+      ],
+      "description": "Classified therapy line."
+    },
+    "urgency": {
+      "type": "string",
+      "enum": ["routine", "expedited", "emergent"],
+      "description": "Urgency level for imaging request."
+    },
+    "classification_confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Confidence in the classification."
+    },
+    "confidence_notes": {
+      "type": "string",
+      "description": "Explanation of confidence level, if not high."
+    }
+  },
+  "required": [
+    "case_id",
+    "cancer_type",
+    "stage",
+    "therapy_line",
+    "urgency",
+    "classification_confidence"
+  ],
+  "additionalProperties": false
+}
