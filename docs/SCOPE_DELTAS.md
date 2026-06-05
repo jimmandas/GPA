@@ -55,11 +55,18 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
   - NOT dynamic guideline updates (static indexed corpus for Phase 3b)
   - NOT Opus/ship-tier eval on RAG quality (dev-tier Sonnet)
 
+- **Eval framework changes (Phase 3b Week 20):**
+  - Add cost tracking for Classifier Agent (~$0.02-0.03/case)
+  - Add cost tracking for vector search / embedding lookup (~$0.001-0.002/case)
+  - Update `estimated_cost_per_case_usd` dimension calculation (baseline shifts ~$0.291 → ~$0.32-0.35/case)
+  - Recalculate `estimated_roi_per_case_usd` (ROI heuristic changes with new cost baseline)
+  - Re-run full eval to establish Phase 3b baseline metrics + per-bucket pass/fail counts
+
 - **Traceability:**
   - New ADR forthcoming: `ADR-021-RAG-NCCN-guideline-retrieval`
   - New ADR forthcoming: `ADR-022-Classifier-agent-design`
   - Existing ADR-011 (RAG architecture) to be updated with Phase 3b concrete implementation
-  - Tests needed: classifier schema validation, vector search retrieval, gap detection logic, UI rendering
+  - Tests needed: classifier schema validation, vector search retrieval, gap detection logic, UI rendering, eval cost calculations
 
 - **Decisions finalized (2026-06-04):**
   - **Vector DB:** pgvector + LlamaIndex (production-grade, determinism-ready)

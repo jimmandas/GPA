@@ -118,6 +118,7 @@ Report: `eval/results/eval_report_20260529_205655.md`
 3. **Week 17-18:** Policy Mapper RAG integration (vector search + dynamic criteria retrieval)
 4. **Week 18-19:** Context Retriever expansion (biomarkers, prior treatments)
 5. **Week 19-20:** Reasoning Drafter gap detection + UI integration (all 5 outputs)
+6. **Week 20 (concurrent):** Update eval cost dimensions for new agents (Classifier + vector search); re-run full eval for Phase 3b baseline
 
 **Next immediate:** Stabilize Phase 3a dashboard (live eval finishing tonight), then start Phase 3b Week 1 tomorrow.
 
