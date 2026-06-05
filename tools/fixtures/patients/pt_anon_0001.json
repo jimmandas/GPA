@@ -43,5 +43,35 @@
       "start_date": "2026-03-15",
       "indication": "Adjuvant therapy post-resection, EGFR exon 19 deletion"
     }
+  ],
+  "biomarkers": [
+    {
+      "test_name": "EGFR mutation",
+      "result": "exon 19 deletion (L747_A750del)",
+      "test_date": "2025-09-28",
+      "status": "actionable"
+    },
+    {
+      "test_name": "PD-L1 expression",
+      "result": "50%",
+      "test_date": "2025-10-02",
+      "status": "actionable"
+    }
+  ],
+  "prior_treatments": [
+    {
+      "treatment_type": "surgery",
+      "procedure": "right upper lobe resection",
+      "date": "2026-02-20",
+      "outcome": "R0 resection, negative margins"
+    },
+    {
+      "treatment_type": "chemotherapy",
+      "regimen": "cisplatin + pemetrexed",
+      "date_start": "2026-03-01",
+      "date_end": "2026-04-15",
+      "cycles_completed": 4,
+      "outcome": "well-tolerated"
+    }
   ]
 }

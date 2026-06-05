@@ -2,6 +2,6 @@
 # Any edit to a prompt file requires updating this hash and re-running eval.
 classifier: "sha256:828014b3d4e053d251d9f1cc1f00ae1957c4c4dc5fe8abacec21c122e26897b8"
 evidence_summarizer: "sha256:c7a60702c4e575d118e411303295408435e96d80949d93476bb3ae4f722ecce9"
-context_retriever: "sha256:8cd187af8995fdd67dae18931a1e16991ae2e8ea5ecab21a5f24413283b47969"
+context_retriever: "sha256:e4013dd4a7d5bdccb4e1f0274b155e75e338d79d21cdb46ccee6672edcb4b6fd"
 policy_mapper: "sha256:62d32cd0055fa2ffe81cfd16513d6ff5b35de9053999774dd516d984f1352d8a"
 reasoning_drafter: "sha256:1b9038c28f379a2283a7869a9bcb8ec58c024c6d29e887e120fe6f71b5023f1a"

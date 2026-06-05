@@ -11,6 +11,8 @@
     "imaging_history": { "type": "array", "items": { "type": "object" } },
     "relevant_diagnoses": { "type": "array", "items": { "type": "object" } },
     "medications": { "type": "array", "items": { "type": "object" } },
+    "biomarkers": { "type": "array", "items": { "type": "object" }, "description": "Phase 3b: tumor biomarkers (PD-L1, EGFR mutation, ALK status, etc.)" },
+    "prior_treatments": { "type": "array", "items": { "type": "object" }, "description": "Phase 3b: prior chemotherapy, radiation, surgery history" },
     "data_source": { "type": "string", "enum": ["fixture"] }
   }
 }
