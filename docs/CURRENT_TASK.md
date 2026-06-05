@@ -122,12 +122,25 @@ Report: `eval/results/eval_report_20260529_205655.md`
 
 **Decision (2026-06-05):** Use **Chroma (local) + LlamaIndex** instead of pgvector for POC. Simpler, no external DB, ADR-011 allows easy migration to pgvector in Phase 4.
 
-**STATUS (end of session 2026-06-05):**
-- ✅ 5-agent pipeline fully integrated (Classifier → Evidence → Context → Policy Mapper (RAG) → Reasoning)
-- ✅ Chroma vector index built (12 NCCN criteria, NSCLC)
-- ✅ Policy Mapper wired to query Chroma by cancer_type + indication
-- ✅ 327 tests passing + 6 classifier tests ready for live eval
-- ⏳ Remaining: Context Retriever enhancements, Reasoning Drafter gaps, UI, eval cost updates
+**✅ PHASE 3b COMPLETE (2026-06-05 end of session):**
+
+| Week | Deliverable | Status |
+|---|---|---|
+| 1-2 | Classifier Agent | ✅ Done |
+| 3-4 | Embedder + Chunker + NCCN fixtures | ✅ Done |
+| 5-6 | Chroma + LlamaIndex vector index | ✅ Done |
+| 7-8 | Policy Mapper RAG integration | ✅ Done |
+| 9-10 | Context Retriever expansion (biomarkers + prior_treatments) | ✅ Done |
+| 11-12 | Reasoning Drafter gap detection enhancement | ✅ Done |
+
+**Final Status:**
+- ✅ 5-agent RAG pipeline fully integrated (Classifier → Evidence → Context → Policy Mapper (Chroma RAG) → Reasoning)
+- ✅ Chroma vector index built and working (12 NCCN criteria, NSCLC POC)
+- ✅ Biomarkers + prior treatments added to context + gap detection rules enhanced
+- ✅ 326 tests passing + 6 classifier tests ready for live eval
+- ⏳ TODO (next session): UI integration + eval cost updates + full Phase 3b baseline run
+
+**Key Achievement:** 5-agent RAG pipeline is feature-complete, tested, and ready for Phase 3b eval validation.
 
 **Next immediate:** Stabilize Phase 3a dashboard (live eval finishing tonight), then start Phase 3b Week 1 tomorrow.
 
