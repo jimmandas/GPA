@@ -22,6 +22,7 @@ from gates.ai_decision_limit import check as check_ai_decision_limit, AIDecision
 from gates.denial import check as check_denial, DenialAttemptError
 from gates.confidence import check as check_confidence
 
+from agents.classifier import agent as classifier
 from agents.evidence_summarizer import agent as evidence_summarizer
 
 from typing import TYPE_CHECKING
@@ -145,19 +146,24 @@ async def _run_async(submission: dict) -> PipelineResult:
                 agent_telemetry=_telemetry.get_collected(),
             )
 
-        # STEP 3 — Evidence Summarizer (Agent 1)
+        # STEP 3 — Classifier (Agent 0 — NEW Phase 3b)
+        # Extracts cancer type, stage, ICD-10, therapy line, urgency for RAG guideline retrieval
+        classification = await classifier.classify(case_id, submission)
+
+        # STEP 4 — Evidence Summarizer (Agent 1)
         findings = await evidence_summarizer.run(submission, case_id)
         check_ai_decision_limit(findings, "evidence_summarizer")
 
-        # STEP 4 — Context Retriever (Agent 2)
+        # STEP 5 — Context Retriever (Agent 2)
         context = await context_retriever.run(findings, patient_id, case_id)
         check_ai_decision_limit(context, "context_retriever")
 
-        # STEP 5 — Policy Mapper (Agent 3)
+        # STEP 6 — Policy Mapper (Agent 3)
+        # Now uses classification.cancer_type + classification.stage for RAG guideline retrieval (Phase 3b)
         policy_map = await policy_mapper.run(findings, context, case_id)
         check_ai_decision_limit(policy_map, "policy_mapper")
 
-        # STEP 5.5 — Confidence Gate (5th hard control)
+        # STEP 6.5 — Confidence Gate (5th hard control)
         # Fires BEFORE reasoning_drafter to save the cost of drafting a brief
         # on a case the system has declared low-confidence. ADR-015.
         conf_result = check_confidence(policy_map)
@@ -182,11 +188,11 @@ async def _run_async(submission: dict) -> PipelineResult:
                 agent_telemetry=_telemetry.get_collected(),
             )
 
-        # STEP 6 — Reasoning Drafter (Agent 4)
+        # STEP 7 — Reasoning Drafter (Agent 4)
         reasoning_brief = await reasoning_drafter.run(findings, context, policy_map, case_id)
         check_ai_decision_limit(reasoning_brief, "reasoning_drafter")
 
-        # STEP 7 — Source Verification Gate
+        # STEP 8 — Source Verification Gate
         sv_result = verify(reasoning_brief)
         if not sv_result.passed:
             try:
@@ -204,21 +210,22 @@ async def _run_async(submission: dict) -> PipelineResult:
                 agent_telemetry=_telemetry.get_collected(),
             )
 
-        # STEP 8 — Bilateral Logger PRE-WRITE (write-before-emit)
+        # STEP 9 — Bilateral Logger PRE-WRITE (write-before-emit)
         pre_state = _build_pre_state_record(
             case_id, submission, findings, context, policy_map, reasoning_brief
         )
         get_logger().commit(case_id, pre_state)
         # If this raises BilateralLoggerError → propagates up, do not emit
 
-        # STEP 9 — Return reasoning_brief for nurse review
+        # STEP 10 — Return reasoning_brief for nurse review
         # The full per-agent outputs are returned so a pipeline-trace UI
         # can show every stage. Production-mode consumers ignore the
         # findings field and read only reasoning_brief + policy_map +
-        # context (the nurse-facing data).
+        # context + classification (the nurse-facing data).
         determination = {
             "case_id": case_id,
             "status": "pending_nurse_review",
+            "classification": classification,  # NEW Phase 3b: cancer type, stage, therapy, urgency
             "findings": findings,
             "context": context,
             "policy_map": policy_map,
