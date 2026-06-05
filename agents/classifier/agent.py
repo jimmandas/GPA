@@ -106,9 +106,9 @@ def _load_and_verify_prompt() -> str:
 _SYSTEM_PROMPT = _load_and_verify_prompt()
 _MODEL_SNAPSHOT = _load_model_snapshot()
 _AGENT_OPTIONS = ClaudeAgentOptions(
-    model=_MODEL_SNAPSHOT,
-    temperature=0,
-    max_tokens=500,
+    system_prompt=_SYSTEM_PROMPT,
+    max_turns=1,
+    allowed_tools=[]
 )
 
 
