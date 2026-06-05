@@ -1,0 +1,40 @@
+# NCCN NSCLC Guidelines v5.2026 — Initial Diagnosis/Workup
+# Indication: initial_diagnosis | Modality: CT
+# Source: NCCN Clinical Practice Guidelines in Oncology, Non-Small Cell Lung Cancer
+# Note: Fixture data for POC Phase 3b. Derived from published NCCN guidance.
+
+indication_category: initial_diagnosis
+modality: CT
+
+criteria:
+  - passage_id: NCCN-NSCLC-INIT-1
+    criterion_text: >
+      Chest CT with contrast is the standard imaging modality for initial
+      evaluation of a patient with a suspicious pulmonary nodule or mass.
+      The CT must include the chest, abdomen, and pelvis to assess for
+      distant metastases.
+    required_evidence:
+      - imaging_request.modality matching "CT"
+      - clinical_indication.diagnosis_text containing lung lesion or nodule mention
+      - clinical_indication.supporting_notes indicating new presentation
+
+  - passage_id: NCCN-NSCLC-INIT-2
+    criterion_text: >
+      Patients with a newly identified pulmonary mass suspicious for lung cancer
+      require baseline staging imaging. If CT chest/abdomen/pelvis with contrast
+      cannot be performed, non-contrast CT or alternative imaging is acceptable
+      with documented clinical justification.
+    required_evidence:
+      - clinical_indication.diagnosis_text present
+      - imaging_request.indication_text OR supporting_notes indicating evaluation for new finding
+
+  - passage_id: NCCN-NSCLC-INIT-3
+    criterion_text: >
+      PET-CT is recommended for initial staging in patients with resectable
+      (stage I-IIIA) NSCLC to evaluate for occult metastatic disease, especially
+      if surgery is being considered.
+    required_evidence:
+      - clinical_indication.supporting_notes indicating surgical candidacy consideration
+      - imaging_request.modality matching "CT" or "PET-CT"
+
+overall_policy_reference: "NCCN NSCLC v5.2026, Initial Diagnosis section"

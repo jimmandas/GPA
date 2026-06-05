@@ -1,0 +1,39 @@
+# NCCN NSCLC Guidelines v5.2026 — Staging
+# Indication: staging | Modality: CT
+# Source: NCCN Clinical Practice Guidelines in Oncology, Non-Small Cell Lung Cancer
+# Note: Fixture data for POC Phase 3b. Derived from published NCCN guidance.
+
+indication_category: staging
+modality: CT
+
+criteria:
+  - passage_id: NCCN-NSCLC-STAG-1
+    criterion_text: >
+      Staging workup for NSCLC includes chest CT with IV contrast (if tolerated)
+      including the apexes to the adrenal glands, liver, and adrenal glands.
+      CT should evaluate for pleural effusion, which impacts staging.
+    required_evidence:
+      - imaging_request.modality matching "CT"
+      - clinical_indication.supporting_notes containing "staging" or "stage" keyword
+      - clinical_indication.diagnosis_code matching "C34" prefix (lung cancer ICD-10)
+
+  - passage_id: NCCN-NSCLC-STAG-2
+    criterion_text: >
+      Patients with central tumors, hilar/mediastinal involvement, or suspected
+      N2-3 disease require mediastinal staging via endoscopic ultrasound (EUS),
+      bronchoscopic ultrasound (EBUS), or mediastinoscopy. CT findings alone
+      are insufficient for N staging in central lesions.
+    required_evidence:
+      - clinical_indication.supporting_notes containing central, hilar, or mediastinal keyword
+      - OR imaging_request.body_region matching "chest" with indication of lymph node assessment
+
+  - passage_id: NCCN-NSCLC-STAG-3
+    criterion_text: >
+      Brain MRI is recommended for all patients with stage III NSCLC or higher,
+      or for stage IB-II with high-risk features (poor performance status,
+      high tumor burden). CT head is an alternative if MRI is contraindicated.
+    required_evidence:
+      - clinical_indication.supporting_notes containing "stage III" or "stage IV"
+      - OR supporting_notes indicating brain imaging concern
+
+overall_policy_reference: "NCCN NSCLC v5.2026, Staging section (TNM stage classification)"

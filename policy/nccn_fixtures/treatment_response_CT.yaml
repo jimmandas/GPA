@@ -1,0 +1,40 @@
+# NCCN NSCLC Guidelines v5.2026 — Treatment Response Assessment
+# Indication: treatment_response | Modality: CT
+# Source: NCCN Clinical Practice Guidelines in Oncology, Non-Small Cell Lung Cancer
+# Note: Fixture data for POC Phase 3b. Derived from published NCCN guidance.
+
+indication_category: treatment_response
+modality: CT
+
+criteria:
+  - passage_id: NCCN-NSCLC-TR-1
+    criterion_text: >
+      Response assessment imaging (chest CT with contrast) is indicated 6-8 weeks
+      after initiation of systemic therapy (chemotherapy, immunotherapy, or targeted
+      therapy) in patients with stage IV or recurrent NSCLC. Imaging should assess
+      target and non-target lesions per RECIST 1.1 criteria.
+    required_evidence:
+      - clinical_indication.supporting_notes containing "during therapy", "on treatment", or "therapy response" keyword
+      - imaging_request.modality matching "CT"
+      - clinical_indication.supporting_notes indicating active systemic therapy
+
+  - passage_id: NCCN-NSCLC-TR-2
+    criterion_text: >
+      For patients on anti-PD-1/PD-L1 immunotherapy, assess response at 8-12 weeks.
+      Immune-related response patterns (iRECIST) may be used to distinguish
+      pseudo-progression from true progression. A minimum 4-week interval is
+      required between baseline and follow-up imaging.
+    required_evidence:
+      - clinical_indication.supporting_notes containing "immunotherapy" or "checkpoint inhibitor" keyword
+      - supporting_notes indicating treatment timeframe (8-12 weeks on therapy)
+
+  - passage_id: NCCN-NSCLC-TR-3
+    criterion_text: >
+      For patients on targeted therapy (EGFR inhibitors, ALK inhibitors, etc.),
+      response assessment should occur at 8-10 weeks after initiation. CT chest
+      should assess primary tumor and any known sites of metastatic disease.
+    required_evidence:
+      - clinical_indication.supporting_notes containing "targeted therapy", "EGFR", "ALK", or "mutation" keyword
+      - clinical_indication.supporting_notes indicating active systemic therapy
+
+overall_policy_reference: "NCCN NSCLC v5.2026, Treatment Response Assessment (RECIST 1.1 / iRECIST)"
