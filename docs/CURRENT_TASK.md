@@ -138,11 +138,15 @@ Report: `eval/results/eval_report_20260529_205655.md`
 - ✅ Chroma vector index built and working (12 NCCN criteria, NSCLC POC)
 - ✅ Biomarkers + prior treatments added to context + gap detection rules enhanced
 - ✅ 326 tests passing + 6 classifier tests ready for live eval
-- ⏳ TODO (next session): UI integration + eval cost updates + full Phase 3b baseline run
 
-**Key Achievement:** 5-agent RAG pipeline is feature-complete, tested, and ready for Phase 3b eval validation.
+**✅ UI INTEGRATION COMPLETE (2026-06-05):**
+- ✅ New: `ui/case_details.html` — multi-agent case viewer showing all 5 agent outputs (Classifier metadata, Evidence Summarizer findings, Context with biomarkers/treatments, Policy Mapper RAG+criteria, Reasoning gaps+focal points)
+- ✅ Update: `eval/dimensions.py` — Phase 3b cost updates: `_AGENTS_PER_RUN=5`, `_VECTOR_SEARCH_COST_PER_CASE=0.001`
+- ✅ Testing: 326 pass / 8 skip. Eval harness tests pass (32 pass / 1 skip).
 
-**Next immediate:** Stabilize Phase 3a dashboard (live eval finishing tonight), then start Phase 3b Week 1 tomorrow.
+**Key Achievement:** 5-agent RAG pipeline is feature-complete, UI-complete, and ready for Phase 3b baseline eval run.
+
+**Next immediate:** Run Phase 3b baseline eval (live dev-tier Sonnet, ~50-80 min) to validate all 5 agents + RAG integration end-to-end.
 
 ---
 

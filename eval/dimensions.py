@@ -1145,7 +1145,8 @@ _TOKENS_PER_AGENT_CALL_OUTPUT = 600
 _TOKENS_PER_JUDGE_CALL_INPUT  = 5000
 _TOKENS_PER_JUDGE_CALL_OUTPUT = 800
 _REPRODUCIBILITY_RUNS = 5
-_AGENTS_PER_RUN = 4
+_AGENTS_PER_RUN = 5  # Phase 3b: Classifier + Evidence Summarizer + Context Retriever + Policy Mapper + Reasoning Drafter
+_VECTOR_SEARCH_COST_PER_CASE = 0.001  # Phase 3b: Chroma embedding lookup + vector search retrieval
 
 
 def _current_agent_model_snapshot() -> str:
@@ -1401,7 +1402,7 @@ def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
         (in_per_case  * agent_rates["input"])  / 1_000_000 +
         (out_per_case * agent_rates["output"]) / 1_000_000
     )
-    retrieval_cost = 0.0
+    retrieval_cost = _VECTOR_SEARCH_COST_PER_CASE  # Phase 3b: Chroma RAG cost
     judge_cost = (
         (judge_in  * judge_rates["input"])  / 1_000_000 +
         (judge_out * judge_rates["output"]) / 1_000_000
@@ -1421,8 +1422,8 @@ def score_estimated_cost_per_case_usd(cases: list[dict]) -> DimensionScore:
         passed=cost_per_case < 2.00,
         notes=(
             f"~${cost_per_case:.3f}/case using model={agent_model}. "
-            f"Reasoning ${reasoning_cost:.3f} (4 agents × 5 reps) + "
-            f"Retrieval ${retrieval_cost:.3f} (tool fixtures mocked; prod ~$0.001/case) + "
+            f"Reasoning ${reasoning_cost:.3f} (5 agents × 5 reps, Phase 3b with Classifier) + "
+            f"Retrieval ${retrieval_cost:.3f} (Chroma RAG lookup + vector search) + "
             f"Judge ${judge_cost:.3f} (eval-only GPT-4o). "
             "HEURISTIC — no SDK telemetry captured (unit mode / mocked SDK). "
             "Run live eval for real per-case cost."

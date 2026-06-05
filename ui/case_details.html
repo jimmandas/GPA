@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Case Details — GPA v4</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f6f8; color: #1a1d23; }
+    header { background: #fff; border-bottom: 1px solid #e2e5ea; padding: 20px 32px; }
+    header h1 { font-size: 1.4rem; font-weight: 700; }
+    header p { font-size: 0.9rem; color: #666; margin-top: 4px; }
+    main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+    .agent-section { background: #fff; border: 1px solid #e2e5ea; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .agent-section h2 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; color: #1a1d23; }
+    .agent-section.agent-0 { border-left: 4px solid #3b82f6; }
+    .agent-section.agent-1 { border-left: 4px solid #8b5cf6; }
+    .agent-section.agent-2 { border-left: 4px solid #ec4899; }
+    .agent-section.agent-3 { border-left: 4px solid #f59e0b; }
+    .agent-section.agent-4 { border-left: 4px solid #10b981; }
+    .field { margin-bottom: 16px; }
+    .field-label { font-size: 0.85rem; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .field-value { font-size: 0.95rem; color: #1a1d23; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; margin-right: 8px; margin-bottom: 8px; }
+    .badge.high { background: #fee2e2; color: #b91c1c; }
+    .badge.medium { background: #fef3c7; color: #92400e; }
+    .badge.low { background: #e0f2fe; color: #0369a1; }
+    .gap-flag { background: #fef3c7; border-left: 3px solid #f59e0b; padding: 12px; margin-bottom: 12px; border-radius: 4px; }
+    .gap-flag .gap-issue { font-weight: 600; color: #92400e; font-size: 0.9rem; }
+    .gap-flag .gap-hint { font-size: 0.85rem; color: #78350f; margin-top: 4px; }
+    .nccn-source { background: #dbeafe; padding: 12px; border-radius: 4px; font-size: 0.9rem; color: #0369a1; }
+    .criteria-list { list-style: none; padding-left: 0; }
+    .criteria-list li { padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+    .criteria-list li:last-child { border-bottom: none; }
+    .criteria-status { display: inline-block; margin-left: 8px; font-size: 0.8rem; padding: 2px 8px; border-radius: 3px; }
+    .status-met { background: #d1fae5; color: #065f46; }
+    .status-unmet { background: #fee2e2; color: #b91c1c; }
+    .status-ambiguous { background: #fef3c7; color: #92400e; }
+    footer { text-align: center; color: #999; font-size: 0.85rem; padding: 20px; margin-top: 40px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1 id="case-title">Case Details</h1>
+  <p id="case-subtitle"></p>
+</header>
+
+<main>
+
+  <!-- Agent 0: Classifier -->
+  <div class="agent-section agent-0">
+    <h2>🔍 Agent 0: Classifier</h2>
+    <div class="field">
+      <div class="field-label">Cancer Type</div>
+      <div class="field-value" id="classifier-cancer-type">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Stage</div>
+      <div class="field-value" id="classifier-stage">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">ICD-10 Code</div>
+      <div class="field-value" id="classifier-icd10">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Therapy Line</div>
+      <div class="field-value" id="classifier-therapy">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Urgency</div>
+      <div class="field-value" id="classifier-urgency">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Confidence</div>
+      <div class="field-value"><span id="classifier-confidence" class="badge"></span></div>
+    </div>
+  </div>
+
+  <!-- Agent 1: Evidence Summarizer -->
+  <div class="agent-section agent-1">
+    <h2>📋 Agent 1: Evidence Summarizer</h2>
+    <div class="field">
+      <div class="field-label">Indication Category</div>
+      <div class="field-value" id="evidence-indication">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Completeness Flags</div>
+      <div id="evidence-completeness">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Key Quotes</div>
+      <ul class="criteria-list" id="evidence-quotes"></ul>
+    </div>
+  </div>
+
+  <!-- Agent 2: Context Retriever -->
+  <div class="agent-section agent-2">
+    <h2>👤 Agent 2: Context Retriever</h2>
+    <div class="field">
+      <div class="field-label">Biomarkers</div>
+      <ul class="criteria-list" id="context-biomarkers"></ul>
+    </div>
+    <div class="field">
+      <div class="field-label">Prior Treatments</div>
+      <ul class="criteria-list" id="context-treatments"></ul>
+    </div>
+    <div class="field">
+      <div class="field-label">Medications</div>
+      <ul class="criteria-list" id="context-medications"></ul>
+    </div>
+  </div>
+
+  <!-- Agent 3: Policy Mapper -->
+  <div class="agent-section agent-3">
+    <h2>⚖️ Agent 3: Policy Mapper (RAG)</h2>
+    <div class="field">
+      <div class="field-label">NCCN Source</div>
+      <div class="nccn-source" id="policy-source">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Criteria Mapping</div>
+      <ul class="criteria-list" id="policy-criteria"></ul>
+    </div>
+    <div class="field">
+      <div class="field-label">Overall Signal</div>
+      <div class="field-value" id="policy-signal">—</div>
+    </div>
+  </div>
+
+  <!-- Agent 4: Reasoning Drafter -->
+  <div class="agent-section agent-4">
+    <h2>💭 Agent 4: Reasoning Drafter</h2>
+    <div class="field">
+      <div class="field-label">AI Rationale</div>
+      <div class="field-value" id="reasoning-rationale" style="line-height: 1.6;">—</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Gap Detection Flags</div>
+      <div id="reasoning-gaps"></div>
+    </div>
+    <div class="field">
+      <div class="field-label">Nursing Focal Points</div>
+      <ul class="criteria-list" id="reasoning-focal-points"></ul>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  GPA v4 · Phase 3b · All 5 agents visible
+</footer>
+
+<script>
+  const API_BASE = window.location.hostname === 'localhost'
+    ? 'http://localhost:8000'
+    : window.location.origin.replace(':8001', ':8000');
+
+  const caseId = new URLSearchParams(window.location.search).get('case_id') || 'unknown';
+
+  async function loadCaseDetails() {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/cases/${caseId}/audit`);
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data = await res.json();
+
+      // Update header
+      document.getElementById('case-title').textContent = `Case ${caseId}`;
+      document.getElementById('case-subtitle').textContent = `Status: ${data.status || 'unknown'} · Last updated: ${new Date().toLocaleString()}`;
+
+      // Note: determination object contains all agent outputs
+      const det = data.determination || {};
+
+      // Agent 0: Classifier
+      const clf = det.classification || {};
+      document.getElementById('classifier-cancer-type').textContent = clf.cancer_type || '—';
+      document.getElementById('classifier-stage').textContent = clf.stage || '—';
+      document.getElementById('classifier-icd10').textContent = clf.icd10_code || 'none';
+      document.getElementById('classifier-therapy').textContent = clf.therapy_line || '—';
+      document.getElementById('classifier-urgency').textContent = clf.urgency || '—';
+      const confBadge = document.getElementById('classifier-confidence');
+      confBadge.textContent = clf.classification_confidence || '—';
+      confBadge.className = `badge ${clf.classification_confidence === 'high' ? 'low' : clf.classification_confidence === 'medium' ? 'medium' : 'high'}`;
+
+      // Agent 1: Evidence
+      const evi = det.findings || {};
+      document.getElementById('evidence-indication').textContent = evi.indication_category || '—';
+      const compFlags = document.querySelector('#evidence-completeness');
+      if (evi.completeness_flags) {
+        const flagHtml = Object.entries(evi.completeness_flags).map(([k, v]) =>
+          `<span class="badge ${v ? 'low' : 'high'}">${k}: ${v ? '✓' : '✗'}</span>`
+        ).join('');
+        compFlags.innerHTML = flagHtml;
+      }
+      const quotesList = document.getElementById('evidence-quotes');
+      if (evi.raw_quotes && evi.raw_quotes.length) {
+        quotesList.innerHTML = evi.raw_quotes.map(q =>
+          `<li>"${q.text}" <span class="criteria-status">${q.source_ref}</span></li>`
+        ).join('');
+      }
+
+      // Agent 2: Context
+      const ctx = det.context || {};
+      const bioList = document.getElementById('context-biomarkers');
+      if (ctx.biomarkers && ctx.biomarkers.length) {
+        bioList.innerHTML = ctx.biomarkers.map(b =>
+          `<li>${b.test_name}: ${b.result}</li>`
+        ).join('');
+      }
+      const txList = document.getElementById('context-treatments');
+      if (ctx.prior_treatments && ctx.prior_treatments.length) {
+        txList.innerHTML = ctx.prior_treatments.map(t =>
+          `<li>${t.treatment_type}: ${t.procedure || t.regimen || ''}</li>`
+        ).join('');
+      }
+      const medList = document.getElementById('context-medications');
+      if (ctx.medications && ctx.medications.length) {
+        medList.innerHTML = ctx.medications.map(m =>
+          `<li>${m.name} ${m.dose ? '(' + m.dose + ')' : ''}</li>`
+        ).join('');
+      }
+
+      // Agent 3: Policy Mapper
+      const pol = det.policy_map || {};
+      document.getElementById('policy-source').textContent = `NCCN ${pol.modality || '?'} · Retrieved via Chroma RAG`;
+      const critList = document.getElementById('policy-criteria');
+      if (pol.criteria && pol.criteria.length) {
+        critList.innerHTML = pol.criteria.map(c => {
+          const statusClass = c.status === 'met' ? 'met' : c.status === 'unmet' ? 'unmet' : 'ambiguous';
+          return `<li>${c.criterion_text.substring(0, 100)}... <span class="criteria-status status-${statusClass}">${c.status}</span></li>`;
+        }).join('');
+      }
+      document.getElementById('policy-signal').textContent = pol.overall_signal || '—';
+
+      // Agent 4: Reasoning
+      const rea = det.reasoning_brief || {};
+      document.getElementById('reasoning-rationale').textContent = rea.ai_rationale || '—';
+      const gapDiv = document.getElementById('reasoning-gaps');
+      if (rea.uncertainty_flags && rea.uncertainty_flags.length) {
+        gapDiv.innerHTML = rea.uncertainty_flags.map(g =>
+          `<div class="gap-flag"><div class="gap-issue">${g.issue}</div><div class="gap-hint">→ ${g.resolution_hint}</div></div>`
+        ).join('');
+      }
+      const fpList = document.getElementById('reasoning-focal-points');
+      if (rea.nurse_focal_points && rea.nurse_focal_points.length) {
+        fpList.innerHTML = rea.nurse_focal_points.map(fp =>
+          `<li><strong>${fp.point}</strong><br><span style="font-size: 0.85rem; color: #666;">${fp.why}</span></li>`
+        ).join('');
+      }
+
+    } catch (err) {
+      document.body.innerHTML = `<main style="padding: 40px;"><p style="color: #b91c1c;">Error loading case: ${err.message}</p></main>`;
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', loadCaseDetails);
+</script>
+
+</body>
+</html>
