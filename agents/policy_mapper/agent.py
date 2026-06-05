@@ -35,6 +35,7 @@ from .schema_validator import validate_policy_map
 from .aggregate import aggregate_overall_signal
 from logs.bilateral_logger import get_logger, BilateralLoggerError
 from rag.retriever import FixtureRetriever, PolicyRetriever
+from rag.chroma_retriever import get_retriever as get_chroma_retriever
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -293,49 +294,62 @@ def _verify_fixture_hash(tool_name: str, fixture_key: str, fixture_path: pathlib
 # Public entry point
 # ---------------------------------------------------------------------------
 
-async def run(findings: dict, context: dict, case_id: str) -> dict:
+async def run(findings: dict, context: dict, classification: dict, case_id: str) -> dict:
     """
     Run the Policy Mapper for one case.
 
-    Calls nccn_passage_lookup directly, verifies fixture hash, then passes
-    NCCN passages + submission evidence to the LLM via query() for mapping.
+    Phase 3b: Uses vector search (Chroma + LlamaIndex) to retrieve NCCN criteria
+    based on cancer_type + indication_category from Classifier Agent.
+    Then maps each criterion against submission evidence via LLM.
 
     Args:
         findings: Schema-validated findings dict from Evidence Summarizer.
         context:  Schema-validated context dict from Context Retriever.
+        classification: Classification dict from Classifier Agent (cancer_type, stage, etc).
         case_id:  Must equal findings["case_id"].
 
     Returns:
         Parsed and schema-validated policy_map dict.
 
     Raises:
-        PolicyMapperError: on any failure (sdk_error, empty_response,
-            json_parse_error, jsonschema_validation_error, fixture_hash_mismatch).
+        PolicyMapperError: on any failure.
         PromptHashMismatchError: if the prompt hash drifted (checked at import).
     """
     indication_category = findings["indication_category"]
     modality = findings["modality"]
-    fixture_key = f"{indication_category}_{modality}"
-    fixture_path = _NCCN_FIXTURES_DIR / f"{fixture_key}.yaml"
+    cancer_type = classification.get("cancer_type", "nsclc")  # Phase 3b: from Classifier
 
-    # --- Verify fixture hash (defense-in-depth alongside RAGIndexValidator) ---
-    fixture_hash: str | None = None
-    if fixture_path.exists():
-        fixture_hash = _verify_fixture_hash("nccn_passage_lookup", fixture_key, fixture_path)
+    # --- Phase 3b: Vector search via Chroma + LlamaIndex ---
+    chroma_retriever = get_chroma_retriever()
+    retrieved_criteria = chroma_retriever.retrieve(
+        cancer_type=cancer_type,
+        indication_category=indication_category,
+        query_text=f"{findings.get('indication_category', '')} imaging for {cancer_type} {classification.get('stage', 'unknown')}",
+        top_k=5,
+    )
 
-    # --- Retrieve via the PolicyRetriever interface (Phase 2 ready) ----------
-    # The retriever is set up to use FixtureRetriever today; a real RAG
-    # implementation (PgvectorRetriever / ChromaRetriever / ...) drops into
-    # the same interface without changing this code. See ADR-011.
-    retriever: PolicyRetriever = _get_retriever()
-    corpus = retriever.retrieve(indication_category, modality)
-    nccn_passages = corpus.to_payload_dict()
+    # Format retrieved criteria for LLM prompt
+    nccn_passages = {
+        "criteria": [
+            {
+                "passage_id": c["passage_id"],
+                "criterion_text": c["criterion_text"],
+                "required_evidence": c.get("required_evidence", []),
+            }
+            for c in retrieved_criteria
+        ],
+        "source": "Chroma Vector Search (Phase 3b RAG)",
+    }
+
     tool_calls_made = [{
         "name": "nccn_passage_lookup",
-        "input": {"indication_category": indication_category, "modality": modality},
-        "fixture_hash": fixture_hash,
-        "retriever_kind": corpus.retriever_kind,
-        "corpus_content_hash": corpus.content_hash,
+        "input": {
+            "cancer_type": cancer_type,
+            "indication_category": indication_category,
+            "modality": modality,
+        },
+        "retriever_kind": "chroma_llamaindex",
+        "retrieved_count": len(retrieved_criteria),
     }]
 
     # --- Build prompt with pre-fetched NCCN passages ------------------------

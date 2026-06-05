@@ -160,7 +160,7 @@ async def _run_async(submission: dict) -> PipelineResult:
 
         # STEP 6 — Policy Mapper (Agent 3)
         # Now uses classification.cancer_type + classification.stage for RAG guideline retrieval (Phase 3b)
-        policy_map = await policy_mapper.run(findings, context, case_id)
+        policy_map = await policy_mapper.run(findings, context, classification, case_id)
         check_ai_decision_limit(policy_map, "policy_mapper")
 
         # STEP 6.5 — Confidence Gate (5th hard control)
