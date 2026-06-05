@@ -18,8 +18,14 @@ venv/
 # Runtime audit logs (regenerated on every eval run)
 decision_log/
 
-# Local Chroma index (rebuild via rag/build_chroma_index.py)
+# Local Chroma index (rebuild via rag/build_index.py — binary, regenerable)
 .chroma/
+chroma_db/
+
+# Eval run artifacts (timestamped reports + JSON companions + run logs).
+# Local run records; regenerable. The diff/trend view reads the JSON locally.
+eval/results/
+*.log
 
 # Physician queue runtime state (regenerated; gitignored like decision_log)
 physician_queue/state.json

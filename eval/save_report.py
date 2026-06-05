@@ -36,6 +36,79 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
 
+def _dim_to_dict(d) -> dict:
+    """Serialize one DimensionScore to a plain dict (diff-view friendly)."""
+    return {
+        "dimension": getattr(d, "dimension", None),
+        "score": getattr(d, "score", None),
+        "target": getattr(d, "target", None),
+        "passed": getattr(d, "passed", None),
+        "bucket": getattr(d, "bucket", None),
+        "is_aggregate": getattr(d, "is_aggregate", None),
+        "breakdown": getattr(d, "breakdown", None),
+        "notes": getattr(d, "notes", None),
+    }
+
+
+def _machine_report(cases, aggregate_scores, timestamp: str) -> dict:
+    """Build the machine-readable companion to the markdown report.
+
+    This is the canonical data source for the eval diff/trend view. It is
+    comparability-aware BY CONSTRUCTION: every run records the metadata needed
+    to decide whether two runs can be honestly compared (tier, model snapshot,
+    framework version, case set, mode). The diff view MUST refuse to diff runs
+    whose `comparability_key` differs, or flag it loudly — that's the guardrail
+    that prevents the small-sample / changed-ruler misreads.
+
+    Per-dimension `n` (sample size) is captured where the scorer exposes it via
+    notes, so a denominator shift (e.g. clinical_signal 6→12 cases) is visible
+    in the diff rather than hidden behind a moved score.
+    """
+    tier = os.environ.get("EVAL_TIER", "dev").lower()
+    model_override = os.environ.get("MODEL_SNAPSHOT_OVERRIDE")
+    case_ids = sorted((getattr(c, "case_id", None) or "") for c in (cases or []))
+    live = os.environ.get("SKIP_INTEGRATION_TESTS", "1") != "1"
+
+    per_case_pass = sum(1 for c in (cases or []) if getattr(c, "overall_pass", False))
+    agg_pass = sum(1 for a in (aggregate_scores or []) if getattr(a, "passed", None) is True)
+    agg_scored = sum(1 for a in (aggregate_scores or []) if getattr(a, "passed", None) is not None)
+
+    return {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat() + "Z",
+        "timestamp": timestamp,
+        "mode": "live" if live else "unit",
+        # --- comparability metadata (the diff-view guardrail) ---------------
+        "tier": tier,
+        "model_snapshot": model_override or "config/model.yaml",
+        "eval_framework_version": "v3",
+        "case_set": case_ids,
+        "case_count": len(case_ids),
+        # A single key two runs must share to be honestly comparable. The diff
+        # view compares this before plotting anything on a shared axis.
+        "comparability_key": f"{tier}|fw=v3|n={len(case_ids)}|mode={'live' if live else 'unit'}",
+        # --- headline rollups ----------------------------------------------
+        "summary": {
+            "cases_run": len(case_ids),
+            "per_case_passed": per_case_pass,
+            "aggregate_passed": agg_pass,
+            "aggregate_scored": agg_scored,
+        },
+        # --- full per-case + aggregate scores ------------------------------
+        "per_case": [
+            {
+                "case_id": getattr(c, "case_id", None),
+                "label": (getattr(c, "ground_truth", {}) or {}).get("label"),
+                "overall_pass": getattr(c, "overall_pass", None),
+                "pipeline_status": getattr(c, "pipeline_status", None),
+                "dimensions": [_dim_to_dict(d) for d in getattr(c, "dimension_scores", []) or []],
+            }
+            for c in (cases or [])
+        ],
+        "aggregate": [_dim_to_dict(a) for a in (aggregate_scores or [])],
+    }
+
+
 def _emergency_dump(cases, aggregate_scores, reason: str) -> str:
     """If print_report fails, at least dump raw per-case + aggregate data so
     the 90+ minutes of eval compute aren't lost."""
@@ -110,10 +183,23 @@ def save():
         sys.stdout = old_stdout
 
     report = buf.getvalue()
-    out_path = f"eval/results/eval_report_{_timestamp()}.md"
+    ts = _timestamp()
+    out_path = f"eval/results/eval_report_{ts}.md"
     with open(out_path, "w") as f:
         f.write(report)
     print(f"Report saved to {out_path}")
+
+    # Machine-readable companion — canonical source for the eval diff/trend view.
+    # Same timestamp stem as the .md so the pair is trivially linkable. Failure
+    # to write JSON must NOT lose the markdown (already on disk above), so guard it.
+    try:
+        json_path = f"eval/results/eval_report_{ts}.json"
+        payload = _machine_report(cases, aggregate_scores, ts)
+        with open(json_path, "w") as f:
+            json.dump(payload, f, indent=2, default=str)
+        print(f"Machine-readable report saved to {json_path}")
+    except Exception:
+        print(f"WARN: machine-readable JSON emit failed:\n{traceback.format_exc()}", file=sys.stderr)
 
 
 if __name__ == "__main__":

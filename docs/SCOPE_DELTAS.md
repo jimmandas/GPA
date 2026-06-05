@@ -84,6 +84,21 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 - **Next:** Begin Phase 3b Week 1 — Classifier Agent design + schema (ADR-022 + code).
 
+#### AS-BUILT AMENDMENT — 2026-06-05 (implementation complete + eval-validated)
+
+The planning record above is preserved as written. What actually shipped deviates on the vector DB and ADR numbering, and is now eval-validated. Recording the deltas-from-the-plan here.
+
+- **Vector DB: Chroma (local) + LlamaIndex — NOT pgvector.** Decision reversed 2026-06-05 (Jim approved: *"switch to chroma and llamindex"*). This also **reverses the 2026-05-27 `scope-removal` of Chroma** — Chroma is back in scope, now over a real 12-criterion NSCLC corpus (4 indication categories × 3 criteria) instead of the old 1-fixture/3-criteria demo. Rationale: no external Postgres dependency for a POC; ADR-011's `PolicyRetriever` interface makes pgvector a Phase 4 swap with zero pipeline changes. The plan's own backout note anticipated this ("pgvector can be dropped and replaced with Chroma without code changes").
+- **ADR numbering deviation:** ADR-021 (`RAG-NCCN-guideline-retrieval`) was NOT written as a separate doc. The Chroma decision + RAG design folded into **ADR-022** (Classifier Agent, now `APPROVED & IMPLEMENTED`) plus this amendment. ADR-011 remains the retriever-interface authority. No orphaned ADR-021 placeholder.
+- **Determinism Contract invariants 11 & 12 are now ACTIVE** (were deferred). Invariant 11: embedding model pinned (`text-embedding-3-small`) in `rag/build_index.py` + `rag/chroma_retriever.py`. Invariant 12: index rebuild is idempotent (delete-before-recreate) — see bug 2 below. Invariant 13 (corpus-update-triggers-rebuild) is mechanically satisfied by the idempotent build but not yet enforced by a preflight; remains a Phase 4 hardening item. SCOPE_BASELINE updated to match.
+- **Two integration bugs found during eval validation and fixed** (commit `3c0aba5`):
+  1. **Source Verification Gate allowlist** missed the Phase 3b context fields (`patient_context.biomarkers`, `patient_context.prior_treatments`), causing hard pipeline failures when the Reasoning Drafter cited them. Fixed in gate + reasoning_drafter prompt (hash updated).
+  2. **RAG index doubled on every rebuild** — `get_or_create_collection` + re-insert appended a full corpus copy each run (24 docs instead of 12), returning duplicate criteria that falsely escalated clean cases. Violated Determinism Contract invariants 12 & 13. Fixed to delete-before-recreate.
+- **Eval baseline (dev-tier Sonnet, 2026-06-05, `eval_report_20260605_200000`):** per-case 3/15, aggregate 9/15. Pipeline completion **0.21 → 0.47** after the bug fixes (escalations halved, 49→24). Governance invariants held perfectly throughout: AI-decision-limit 1.00, adversarial-bypass 0.00, source-citation 1.00, cost ~$0.30/case. **Honest caveat:** the aggregate count and `clinical_signal_accuracy` (1.00→0.58) did not regress — the completion fix *doubled the scored sample* (6→12 cases), revealing true Sonnet clinical-judgment variance previously masked by uniform escalation. This is the documented model-tier limitation; ship-tier Opus is the expected fix. **This is a dev-tier baseline; a ship-tier Opus run is pending Jim's approval and would append a comparable column.**
+- **Eval tooling:** `eval/save_report.py` now emits a machine-readable `eval_report_<ts>.json` alongside the `.md` (comparability-aware: tier, framework version, case-set, mode). Canonical source for a future eval diff/trend view (backlogged). Cheap hygiene; unlocks honest run-to-run comparison.
+- **Cost dimension:** `_AGENTS_PER_RUN` 4→5, `_VECTOR_SEARCH_COST_PER_CASE` $0.001 added. Real telemetry shows ~$0.30/case (vs the planned ~$0.32-0.35 estimate — came in slightly under).
+- **Commits:** `02843e0`→`3c0aba5` (Phase 3b build + UI + eval updates + bug fixes). Completion summary: `docs/PHASE_3b_COMPLETION_SUMMARY.md`.
+
 ---
 
 ### scope-addition: Phase 3a—Case Status Web UI + Audit Trail View + JWS Signatures + MongoDB — 2026-06-04 (AMENDED 2026-06-04)

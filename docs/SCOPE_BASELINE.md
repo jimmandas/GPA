@@ -63,13 +63,15 @@ These do NOT move without explicit user approval (and a logged delta in `SCOPE_D
 9. Byte-identical event stream across 5 runs (mod timestamps)
 10. `ClaudeAgentOptions` version-pinned
 
-### Phase 2 extensions (invariants 11-14) — STATUS: deferred
+### Phase 2 extensions (invariants 11-14) — STATUS: 11-12 ACTIVE (Phase 3b), 13 partial, 14 removed
+
+Activated by Phase 3b RAG (Chroma + LlamaIndex, 2026-06-05). See SCOPE_DELTAS Phase 3b as-built amendment.
 
 | # | Invariant | Status |
 |---|---|---|
-| 11 | Embedding model snapshot pinned | ⚠ deferred (RAG cut from Phase 2) |
-| 12 | RAG index content-hashed | ⚠ partially active (fixture mode hash validated; full RAG deferred) |
-| 13 | Corpus update requires rebuild + eval re-run | ⚠ deferred (no real corpus to rebuild) |
+| 11 | Embedding model snapshot pinned | ✅ **active** — `text-embedding-3-small` pinned in `rag/build_index.py` + `rag/chroma_retriever.py` (Phase 3b, 2026-06-05) |
+| 12 | RAG index content-hashed | ✅ **active** — index rebuild is idempotent (delete-before-recreate); 12-criterion NSCLC corpus in Chroma. (Content-hash preflight is Phase 4 hardening; idempotent build is the load-bearing guarantee today.) |
+| 13 | Corpus update requires rebuild + eval re-run | ⚠ partial — idempotent rebuild makes this mechanically true; no automated preflight enforcing it yet (Phase 4) |
 | 14 | EHR stub schemas version-pinned | ❌ removed (FHIR upgrade cut) |
 
 ### Eval framework
@@ -152,7 +154,7 @@ The eval framework was bumped from v1 (8 scope §7 dims) to **v2 (12 active dims
 
 ## ADR Registry
 
-ADR-000 through ADR-018 are written. (Phase 2 plan originally reserved 015-016 for confidence calibration and max_turns budget; both were written 2026-05-27 and corrected in this registry on 2026-05-28.)
+ADR-000 through ADR-018 are written, plus ADR-022 (Phase 3b Classifier Agent + RAG, 2026-06-05). (Phase 2 plan originally reserved 015-016 for confidence calibration and max_turns budget; both were written 2026-05-27 and corrected in this registry on 2026-05-28. ADR-019-021 were not written — 019-020 unused; 021 folded into ADR-022 + SCOPE_DELTAS as-built amendment.)
 
 | # | Title | Status |
 |---|---|---|
@@ -175,15 +177,17 @@ ADR-000 through ADR-018 are written. (Phase 2 plan originally reserved 015-016 f
 | 016 | max_turns budget increase | ✅ |
 | 017 | EVAL_TIER: dev/Sonnet vs ship/Opus | ✅ (renumbered from earlier draft 015) |
 | 018 | Bias / disparity monitoring | ✅ (scope-addition) |
+| 022 | Classifier Agent design (+ Phase 3b RAG: Chroma over pgvector) | ✅ APPROVED & IMPLEMENTED (2026-06-05). ADR-021 folded in — see SCOPE_DELTAS as-built amendment |
 
 ---
 
 ## Approved Scope Additions (beyond the original docs)
 
-Tracked in `SCOPE_DELTAS.md`. Two active items:
+Tracked in `SCOPE_DELTAS.md`. Active items:
 
 - **Runtime confidence gate** — not in original scope; user approved adding 2026-05-27. Maps to planned ADR-015.
 - **Bias monitoring** — not in original scope/strategy; user approved adding 2026-05-27. New ADR (018+).
+- **Phase 3b — RAG-enhanced NCCN retrieval + Classifier Agent** — approved 2026-06-04, implemented + eval-validated 2026-06-05. 5-agent pipeline (Classifier → Evidence → Context → Policy Mapper[Chroma RAG] → Reasoning). Chroma+LlamaIndex over a 12-criterion NSCLC corpus (reverses 2026-05-27 Chroma removal). Activates Determinism Contract invariants 11-12. Dev-tier baseline: completion 0.21→0.47 after bug fixes; governance invariants held (AI-decision-limit 1.00, adversarial-bypass 0.00). ADR-022. Ship-tier Opus run pending.
 
 ## Phase 3 Backlog
 
