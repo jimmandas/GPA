@@ -22,6 +22,8 @@ ALLOWED_SOURCE_REFS: set[str] = {
     "patient_context.imaging_history",
     "patient_context.relevant_diagnoses",
     "patient_context.medications",
+    "patient_context.biomarkers",        # Phase 3b: Context Retriever biomarkers field
+    "patient_context.prior_treatments",  # Phase 3b: Context Retriever prior_treatments field
     "policy_map.criteria",
     "none",
 }

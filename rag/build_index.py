@@ -87,12 +87,21 @@ def build_index():
     )
     Settings.embed_model = embed_model
 
-    # Create Chroma client and vector store
+    # Create Chroma client and vector store.
+    # Idempotency (Determinism Contract invariants 12 & 13): a rebuild MUST
+    # produce a fresh index, not append to the existing one. get_or_create
+    # + re-insert would DOUBLE the corpus on every rebuild, silently corrupting
+    # retrieval. Delete any existing collection first so rebuild == clean build.
     print(f"Initializing Chroma vector store at {CHROMA_DB_PATH}...")
     CHROMA_DB_PATH.mkdir(exist_ok=True)
     client = chromadb.PersistentClient(path=str(CHROMA_DB_PATH))
+    try:
+        client.delete_collection(name="nccn_nsclc_v5")
+        print("   Cleared existing collection (idempotent rebuild)")
+    except Exception:
+        pass  # collection didn't exist — first build
     vector_store = ChromaVectorStore(
-        chroma_collection=client.get_or_create_collection(
+        chroma_collection=client.create_collection(
             name="nccn_nsclc_v5",
             metadata={"hnsw:space": "cosine"},
         )

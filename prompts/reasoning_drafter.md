@@ -49,6 +49,8 @@ Every claim in supporting_evidence and every flag in uncertainty_flags must cite
 - patient_context.imaging_history
 - patient_context.relevant_diagnoses
 - patient_context.medications
+- patient_context.biomarkers
+- patient_context.prior_treatments
 - policy_map.criteria
 
 ## supporting_evidence Rules
