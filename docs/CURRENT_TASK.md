@@ -113,12 +113,21 @@ Report: `eval/results/eval_report_20260529_205655.md`
 - ✅ Embedding model: **OpenAI text-embedding-3-small** (pinned snapshot)
 
 **Phase 3b roadmap (Weeks 13-20):**
-1. **Week 13-14:** Classifier Agent design + schema (ADR-022, tests)
-2. **Week 15-16:** pgvector setup + NCCN corpus indexing (parse nscl.pdf → chunks → embeddings → index)
-3. **Week 17-18:** Policy Mapper RAG integration (vector search + dynamic criteria retrieval)
-4. **Week 18-19:** Context Retriever expansion (biomarkers, prior treatments)
-5. **Week 19-20:** Reasoning Drafter gap detection + UI integration (all 5 outputs)
-6. **Week 20 (concurrent):** Update eval cost dimensions for new agents (Classifier + vector search); re-run full eval for Phase 3b baseline
+1. **Week 13-14:** ✅ Classifier Agent design + schema (ADR-022, tests)
+2. **Week 15-16:** ✅ Embedder + Chunker infrastructure + 4 NCCN fixtures (CHROMA + LLAMAINDEX, not pgvector)
+3. **Week 17-18:** ✅ Chroma + LlamaIndex vector index creation + Policy Mapper RAG integration
+4. **Week 18-19:** Context Retriever expansion (biomarkers, prior treatments) — TODO
+5. **Week 19-20:** Reasoning Drafter gap detection + UI integration (all 5 outputs) — TODO
+6. **Week 20 (concurrent):** Update eval cost dimensions for new agents (Classifier + vector search); re-run full eval for Phase 3b baseline — TODO
+
+**Decision (2026-06-05):** Use **Chroma (local) + LlamaIndex** instead of pgvector for POC. Simpler, no external DB, ADR-011 allows easy migration to pgvector in Phase 4.
+
+**STATUS (end of session 2026-06-05):**
+- ✅ 5-agent pipeline fully integrated (Classifier → Evidence → Context → Policy Mapper (RAG) → Reasoning)
+- ✅ Chroma vector index built (12 NCCN criteria, NSCLC)
+- ✅ Policy Mapper wired to query Chroma by cancer_type + indication
+- ✅ 327 tests passing + 6 classifier tests ready for live eval
+- ⏳ Remaining: Context Retriever enhancements, Reasoning Drafter gaps, UI, eval cost updates
 
 **Next immediate:** Stabilize Phase 3a dashboard (live eval finishing tonight), then start Phase 3b Week 1 tomorrow.
 
