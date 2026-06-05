@@ -259,7 +259,6 @@ async def test_classifier_audit_logged():
         result = await classify(
             "test_audit_001",
             SYNTHETIC_CASES["nsclc_staging_first_line"]["submission"],
-            decision_log_dir=log_dir,
         )
 
         # Check that case log file was created

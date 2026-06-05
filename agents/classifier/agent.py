@@ -119,7 +119,6 @@ _AGENT_OPTIONS = ClaudeAgentOptions(
 async def classify(
     case_id: str,
     submission: dict,
-    decision_log_dir: pathlib.Path = _DECISION_LOG_DIR,
 ) -> dict:
     """
     Classify a prior authorization submission into cancer type, stage, ICD-10,
@@ -128,7 +127,6 @@ async def classify(
     Args:
         case_id: Unique case identifier
         submission: Dict with keys 'imaging_request', 'clinical_indication', 'patient_context'
-        decision_log_dir: Path to decision_log/ directory
 
     Returns:
         classification: Dict matching schemas/classifier.json
@@ -138,7 +136,7 @@ async def classify(
         BilateralLoggerError: If bilateral logger fails
     """
     try:
-        logger = get_logger(decision_log_dir)
+        logger = get_logger()
     except Exception as e:
         raise ClassifierError("logger_init", str(e))
 
