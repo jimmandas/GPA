@@ -9,7 +9,8 @@ import os
 import pathlib
 from typing import List, Dict
 
-from llama_index.core import VectorStoreIndex, Settings
+from llama_index.core import VectorStoreIndex, Settings, StorageContext
+from llama_index.core.vector_stores.types import MetadataFilters, MetadataFilter, FilterOperator, FilterCondition
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
@@ -43,7 +44,10 @@ class ChromaNcclnRetriever:
                 metadata={"hnsw:space": "cosine"},
             )
         )
-        self.index = VectorStoreIndex.from_vector_store(vector_store)
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        self.index = VectorStoreIndex.from_vector_store(
+            vector_store, storage_context=storage_context
+        )
 
     def retrieve(
         self,
@@ -69,19 +73,17 @@ class ChromaNcclnRetriever:
         if not query_text:
             query_text = f"NCCN criteria for {cancer_type} {indication_category}"
 
-        # Retrieve from index with metadata filter
+        # Retrieve from index with metadata filters (MetadataFilters API, not raw list)
+        filters = MetadataFilters(
+            filters=[
+                MetadataFilter(key="cancer_type", value=cancer_type, operator=FilterOperator.EQ),
+                MetadataFilter(key="indication_category", value=indication_category, operator=FilterOperator.EQ),
+            ],
+            condition=FilterCondition.AND,
+        )
         retriever = self.index.as_retriever(
             similarity_top_k=top_k,
-            filters=[
-                {
-                    "key": "cancer_type",
-                    "value": cancer_type,
-                },
-                {
-                    "key": "indication_category",
-                    "value": indication_category,
-                },
-            ],
+            filters=filters,
         )
 
         nodes = retriever.retrieve(query_text)

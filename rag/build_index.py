@@ -13,7 +13,7 @@ import pathlib
 import yaml
 from typing import List, Dict
 
-from llama_index.core import Document, VectorStoreIndex, Settings
+from llama_index.core import Document, VectorStoreIndex, Settings, StorageContext
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
@@ -98,11 +98,12 @@ def build_index():
         )
     )
 
-    # Create index and insert documents
+    # Create index and insert documents — StorageContext required for Chroma persistence
     print(f"Building vector index (embedding {len(documents)} documents)...")
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
     index = VectorStoreIndex.from_documents(
         documents,
-        vector_store=vector_store,
+        storage_context=storage_context,
         show_progress=True,
     )
 
