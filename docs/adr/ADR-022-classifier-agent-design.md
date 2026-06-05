@@ -1,6 +1,6 @@
 # ADR-022: Classifier Agent Design
 
-**Status:** PROPOSED (2026-06-05)
+**Status:** APPROVED & IMPLEMENTED (2026-06-05)
 
 **Context:**
 
