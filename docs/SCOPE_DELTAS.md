@@ -16,6 +16,69 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
+### scope-addition: Phase 3b—RAG-Enhanced NCCN Guideline Retrieval + Classifier Agent — 2026-06-04
+
+- **Date logged:** 2026-06-04
+- **Decision:** User approved (Jim, 2026-06-04): *"lets add RAG to scope... I approve all five agent output changes to UI"*
+- **What's being added:**
+  - **Phase 3b goal:** Expand from fixture-based policy mapping to vector-search-backed NCCN guideline retrieval with explicit classification and gap detection
+  - **5-agent pipeline (replacing current 4):**
+    1. **Classifier Agent (NEW)** — Step 1: Extract cancer type, stage, ICD/CPT, therapy line, urgency from submission
+    2. **Evidence Summarizer (MINIMAL CHANGE)** — Step 4: Extract findings (takes classifier output as context)
+    3. **Context Retriever (ENHANCED)** — Step 3: Expand EHR retrieval (biomarkers, prior treatments, medication history)
+    4. **Policy Mapper (MAJOR CHANGE)** — Steps 2, 5: Vector search NCCN guidelines by indication, map evidence to retrieved criteria (no longer static)
+    5. **Reasoning Drafter (ENHANCED)** — Steps 6-7: Add gap detection logic, flag missing staging/biomarkers/prior docs
+  
+- **UI changes (all approved):**
+  - **Classifier outputs:** Display cancer type, stage, ICD/CPT, therapy, urgency as case metadata
+  - **Policy Mapper source:** Show retrieved NCCN section (e.g., "Used: NCCN NSCLC v5.2026 § Staging Criteria")
+  - **Context Retriever detail:** Display retrieved biomarkers, prior treatments, medication history
+  - **Gap detection panel:** Prominent, actionable list of missing items (red/yellow flags)
+  - **RAG metadata:** Show guideline retrieval source (audit transparency)
+
+- **Why this matters:**
+  - **Current state (fixture-based):** Works for 1 guideline, 3 criteria. Not scalable.
+  - **Phase 3b goal:** Proven RAG pipeline supporting 3-5 NCCN guidelines, multiple indications, real corpus
+  - **Admissibility win:** Explicit source citation (which NCCN doc was used) + gap detection (what evidence is missing)
+  - **Production readiness:** Enables multi-cancer case routing with semantic guideline matching
+
+- **Implementation phases:**
+  1. **Phase 3b Week 1-2:** Classifier Agent + schema
+  2. **Phase 3b Week 3-4:** Policy Mapper RAG integration (vector search + NCCN corpus indexing)
+  3. **Phase 3b Week 5:** Context Retriever expansion (biomarkers + prior treatments)
+  4. **Phase 3b Week 6-7:** Reasoning Drafter gap detection
+  5. **Phase 3b Week 8:** UI integration (all 5 outputs)
+
+- **Scope boundaries (NOT included):**
+  - NOT multi-tenancy or RBAC
+  - NOT real EHR integration (still fixtures for patient context)
+  - NOT dynamic guideline updates (static indexed corpus for Phase 3b)
+  - NOT Opus/ship-tier eval on RAG quality (dev-tier Sonnet)
+
+- **Traceability:**
+  - New ADR forthcoming: `ADR-021-RAG-NCCN-guideline-retrieval`
+  - New ADR forthcoming: `ADR-022-Classifier-agent-design`
+  - Existing ADR-011 (RAG architecture) to be updated with Phase 3b concrete implementation
+  - Tests needed: classifier schema validation, vector search retrieval, gap detection logic, UI rendering
+
+- **Decisions finalized (2026-06-04):**
+  - **Vector DB:** pgvector + LlamaIndex (production-grade, determinism-ready)
+  - **NCCN corpus:** NSCLC only for Phase 3b POC (multi-cancer Phase 4+)
+  - **Timeline:** Phase 3b Weeks 13-20 (8 weeks post-Phase-3a stabilization)
+  - **Embedding model:** OpenAI text-embedding-3-small (pinned snapshot, Determinism Contract invariant 11)
+  - **EHR expansion:** Biomarkers + prior treatment history added to fixtures
+
+- **Risk / Unknowns:**
+  - **pgvector ops:** Need PostgreSQL + pgvector extension. Docker container for local dev, cloud (Supabase/RDS) for production.
+  - **NCCN licensing:** Assumption is NCCN guideline text is available (user sourced /Users/lauramandas/Downloads/nscl.pdf). Chunking/indexing starts from there.
+  - **Embedding model cost:** OpenAI text-embedding-3-small is ~$0.02/1M tokens. NSCLC guideline (~100K tokens) = ~$0.002 to index once.
+
+- **Backout / Rollback:** Straightforward for POC. If RAG retrieval causes quality issues before Phase 3b ships, fall back to static fixture-based criteria. The Classifier Agent can be left in (minimal risk); Policy Mapper reverts to fixtures. pgvector can be dropped and replaced with Chroma without code changes (same retriever interface, ADR-011).
+
+- **Next:** Begin Phase 3b Week 1 — Classifier Agent design + schema (ADR-022 + code).
+
+---
+
 ### scope-addition: Phase 3a—Case Status Web UI + Audit Trail View + JWS Signatures + MongoDB — 2026-06-04 (AMENDED 2026-06-04)
 
 - **Date logged:** 2026-06-04 | **Amended:** 2026-06-04

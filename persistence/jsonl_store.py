@@ -102,7 +102,11 @@ class JSONLCaseStore(CaseStore):
     def _all_case_ids(self) -> List[str]:
         if not self.log_dir.exists():
             return []
-        return sorted(f.stem for f in self.log_dir.glob("case_*.jsonl"))
+        # Include both production (case_NNNN) and demo (demo_NNNN) cases
+        cases = set()
+        for pattern in ["case_*.jsonl", "demo_*.jsonl"]:
+            cases.update(f.stem for f in self.log_dir.glob(pattern))
+        return sorted(cases)
 
     def find_by_status(self, status: str, limit: int = 100) -> List[dict]:
         """Return case summaries matching a status (newest first)."""

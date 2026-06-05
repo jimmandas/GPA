@@ -89,6 +89,40 @@ Report: `eval/results/eval_report_20260529_205655.md`
 
 ---
 
+## What's next (Phase 3b: RAG + Classifier Agent)
+
+### 🎯 **PHASE 3b APPROVED (2026-06-04): RAG-Enhanced NCCN Guideline Retrieval + Classifier Agent**
+
+**User approval:** Jim approved Phase 3b scope addition 2026-06-04.
+
+**High-level goal:** Expand from fixture-based policy mapping (1 guideline, 3 criteria) to RAG-backed NCCN retrieval with explicit classification + gap detection. 5-agent pipeline.
+
+**Scope:**
+- **NEW:** Classifier Agent (cancer type, stage, ICD/CPT, therapy, urgency extraction)
+- **ENHANCED:** Policy Mapper (vector search NCCN by indication, dynamic criteria retrieval)
+- **ENHANCED:** Context Retriever (biomarkers, prior treatments, meds)
+- **ENHANCED:** Reasoning Drafter (gap detection: flag missing staging, biomarkers, prior docs)
+- **UI CHANGES:** Display all 5 agent outputs (classifier metadata, NCCN source, retrieved context, gap flags, RAG metadata)
+
+**Timeline:** Weeks 13-20 post-Phase-3a (est. 8 weeks for full POC)
+
+**Decisions finalized (2026-06-04):**
+- ✅ Vector DB: **pgvector + LlamaIndex** (production-ready)
+- ✅ NCCN corpus: **NSCLC only** (lean POC, Phase 4 for multi-cancer)
+- ✅ Timeline: **Weeks 13-20** (8 weeks post-Phase-3a)
+- ✅ Embedding model: **OpenAI text-embedding-3-small** (pinned snapshot)
+
+**Phase 3b roadmap (Weeks 13-20):**
+1. **Week 13-14:** Classifier Agent design + schema (ADR-022, tests)
+2. **Week 15-16:** pgvector setup + NCCN corpus indexing (parse nscl.pdf → chunks → embeddings → index)
+3. **Week 17-18:** Policy Mapper RAG integration (vector search + dynamic criteria retrieval)
+4. **Week 18-19:** Context Retriever expansion (biomarkers, prior treatments)
+5. **Week 19-20:** Reasoning Drafter gap detection + UI integration (all 5 outputs)
+
+**Next immediate:** Stabilize Phase 3a dashboard (live eval finishing tonight), then start Phase 3b Week 1 tomorrow.
+
+---
+
 ## What's next (Phase 3a: Case Status UI + Audit Trail)
 
 ### 🎯 **PHASE 3a IN PROGRESS: Web UI for Case Status + Audit Trail View**
