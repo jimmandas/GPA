@@ -152,7 +152,10 @@ Classify this case."""
     classification_text = ""
     try:
         async for message in query(prompt=user_prompt, options=_AGENT_OPTIONS):
-            classification_text += message.text or ""
+            if hasattr(message, "content") and message.content:
+                for block in message.content:
+                    if hasattr(block, "text"):
+                        classification_text += block.text
     except Exception as e:
         raise ClassifierError("llm_call", str(e))
 

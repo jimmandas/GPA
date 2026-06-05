@@ -3,7 +3,7 @@
 # Any edit to a fixture file requires updating this hash.
 
 patient_history_lookup:
-  pt_anon_0001: "sha256:9ce94b7b3f4c9c911226329ff15d6956a32ca33995eece6f173e6eacb6458120"
+  pt_anon_0001: "sha256:b22d2d2b860d2132368efe38c2fa2459a766249b31417409d3271dff8397f4e9"
   pt_anon_0002: "sha256:33e2ffbd75abed95a2ee7c957cfb48b97a69cde6cabf9e57367fd8b154956a12"
 
 prior_imaging_lookup:
