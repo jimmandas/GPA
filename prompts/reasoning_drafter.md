@@ -60,9 +60,13 @@ Every claim in supporting_evidence and every flag in uncertainty_flags must cite
 ## uncertainty_flags Rules
 
 - Extract one flag per ambiguous or unmet criterion from policy_map.criteria.
+- Also extract flags for missing clinical evidence (Phase 3b enhancement):
+  - Missing biomarkers (e.g., PD-L1 status for immunotherapy cases)
+  - Missing prior treatment history (e.g., no chemotherapy history documented)
+  - Missing staging confirmation (e.g., stage not clinically confirmed)
 - Each flag must state the specific gap, not a generic "evidence missing" statement.
 - resolution_hint must be actionable — what the nurse should specifically check.
-- If policy_map has no ambiguous or unmet criteria, return an empty array.
+- If policy_map has no ambiguous or unmet criteria AND no missing evidence, return an empty array.
 
 ## nurse_focal_points Rules
 
