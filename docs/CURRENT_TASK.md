@@ -1,4 +1,35 @@
-# Current Task — Updated 2026-06-04 (Phase 3a MongoDB Shipped)
+# Current Task — Updated 2026-06-06 (Phase 3b eval-validated; root cause pinned)
+
+## 🎯 SESSION 2026-06-05/06: Phase 3b eval validation + root-cause investigation
+
+**What shipped this session (commits, newest first):**
+- `7ef241f` — Phase 3b eval investigation recorded in SCOPE_DELTAS (3 hypotheses, root cause pinned). No code change (failed prompt recal reverted).
+- `2b19a0b` — Closed Phase 3b doc gap (SCOPE_DELTAS + SCOPE_BASELINE) + added machine-readable `eval_report_<ts>.json` emission to `eval/save_report.py`; gitignored `chroma_db/`, `eval/results/`, `*.log`.
+- `3c0aba5` — Fixed two Phase 3b eval-blocking bugs: source-ref allowlist (biomarkers/prior_treatments) + RAG index idempotency (delete-before-recreate; was doubling to 24 docs).
+- (earlier) `c4fc567`, `8e5d167`, `84224ee` — Phase 3b RAG integration bug fixes + UI + eval cost updates.
+
+**The investigation arc (this is the valuable part):**
+clinical_signal_accuracy stuck ~0.58. Three hypotheses tested:
+1. Model-tier (Sonnet variance) → **REFUTED** by ship-tier Opus run (`eval_report_20260605_223300`): Opus 0.50, *worse* not better. Opus improved consistency only (reproducibility 0.76→0.81, per-case 3→5).
+2. Absence→unmet conservative bias → **REFUTED**: policy_mapper prompt recalibration (eval-critic approved as sound/non-gaming) moved ZERO on target cases. Reverted as unmeasured.
+3. **Non-applicable criteria marked "unmet"** → **CONFIRMED with diagnostic evidence.** RAG retrieves top-3 criteria by similarity; ones that don't apply to the case scenario get marked `unmet` (evidence_ref cites real fields, NOT absence), and overall_signal precedence ("any unmet → does_not_meet") cascades one non-applicable criterion into whole-case rejection. Example: case_0009 (expected meets_criteria, 9mo post-chemoradiation) — SURV-3 "receiving adjuvant therapy" criterion marked unmet though patient finished therapy. Status enum lacks `not_applicable`.
+
+**Recorded baseline:** `eval_report_20260606_005031` (dev-tier Sonnet, per-case 5/15, aggregate 8/15). Governance invariants held throughout: ai_decision_limit 1.00, adversarial_gate_bypass 0.00, source_citation 1.00.
+
+**Caveats logged (don't trust without verifying):**
+- Opus cost telemetry implausible — $0.285/case ≈ Sonnet's $0.295 despite 5× list rate. SDK `total_cost_usd` likely proxy flat-rate, not per-token. Verify before publishing any Opus cost figure.
+
+## What's next (2 scoped backlog tasks spawned this session)
+1. **`task_f9bc2a32` — Add `not_applicable` criterion status + fix overall_signal precedence.** THE clinical_signal fix. Touches schemas/policy_map.json, prompts/policy_mapper.md (+hash), gates/confidence.py count, eval/dimensions.py. Guards: eval-critic review (gaming risk), case_0002 must still land does_not_meet, adversarial-bypass stays 0.00.
+2. **`task_cd4ce4f3` — Recalibrate confidence gate ambiguous-escalation.** The lever for completion_rate + false_escalation_rate. Gate escalates ALL ambiguous signals, contradicting its own docstring (1-2 ambiguous = assist-able). Sequence AFTER task 1 (shared ambiguous/unmet count math).
+
+**Also pending (lower priority):**
+- Eval diff/trend view UI (`task_266cbb14`) — consumes the new JSON; most compelling once a clean dev-vs-fixed comparison exists.
+- 2 classifier LLM-variance test failures (narrow urgency-enum assertion + wrong audit-log path in test) — test robustness, not pipeline bugs.
+
+**Open question for Jim:** ground-truth label quality for judgment-intensive cases. case_0009 GT looks defensible, but the eval-critic flagged inconsistency in how GT treats "not applicable by stage" (case_0005 SURV-3=unmet vs case_0011 SURV-3=ambiguous for similar not-indicated situations). Worth a GT audit before chasing clinical_signal to 0.80 — risk of fitting noisy labels.
+
+---
 
 ## ✅ P1 COMPLETE (2026-05-31): Phase 1 of governance roadmap shipped
 
