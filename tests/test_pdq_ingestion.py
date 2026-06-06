@@ -10,6 +10,54 @@ import pathlib
 import pytest
 
 from rag.ingest_pdq import load_corpus, build_chunks, SECTION_TARGET_CHARS, CORPUS_PATH
+from rag.parse_pdq import extract_sections, MIN_SECTION_CHARS
+
+
+# ---------------------------------------------------------------------------
+# Parse stage (rag/parse_pdq.py) — network-free, exercises extract_sections()
+# ---------------------------------------------------------------------------
+
+def test_parser_segments_by_heading():
+    """Headings become section boundaries; paragraphs accrue under their heading."""
+    big = "A clinical sentence about NSCLC treatment and staging. " * 6  # > MIN_SECTION_CHARS
+    htmldoc = f"""
+    <html><body><article>
+      <h2>Stage Information</h2><p>{big}</p>
+      <h2>Treatment Options</h2><p>{big}</p>
+    </article></body></html>
+    """
+    secs = extract_sections(htmldoc)
+    headings = [s["heading"] for s in secs]
+    assert "Stage Information" in headings
+    assert "Treatment Options" in headings
+    assert all(s["char_len"] >= MIN_SECTION_CHARS for s in secs)
+
+
+def test_parser_drops_short_boilerplate_sections():
+    """Sections under the min-char threshold are dropped (nav crumbs etc.)."""
+    htmldoc = """
+    <html><body><article>
+      <h2>Tiny</h2><p>too short</p>
+    </article></body></html>
+    """
+    assert extract_sections(htmldoc) == []
+
+
+def test_parser_is_text_only_excludes_tables_and_scripts():
+    """License + chunking: tables/scripts/figures are excluded from extracted text."""
+    body = "Clinical guidance prose about lung cancer treatment options here. " * 6
+    htmldoc = f"""
+    <html><body><article>
+      <h2>Section</h2>
+      <p>{body}</p>
+      <script>var secret = 'should not appear';</script>
+      <table><tr><td>IMAGE_TABLE_CONTENT_X</td></tr></table>
+    </article></body></html>
+    """
+    secs = extract_sections(htmldoc)
+    joined = " ".join(s["text"] for s in secs)
+    assert "secret" not in joined
+    assert "IMAGE_TABLE_CONTENT_X" not in joined
 
 
 def test_corpus_present_and_provenance():
