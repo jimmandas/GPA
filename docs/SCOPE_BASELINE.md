@@ -154,7 +154,7 @@ The eval framework was bumped from v1 (8 scope §7 dims) to **v2 (12 active dims
 
 ## ADR Registry
 
-ADR-000 through ADR-018 are written, plus ADR-022 (Phase 3b Classifier Agent + RAG, 2026-06-05). (Phase 2 plan originally reserved 015-016 for confidence calibration and max_turns budget; both were written 2026-05-27 and corrected in this registry on 2026-05-28. ADR-019-021 were not written — 019-020 unused; 021 folded into ADR-022 + SCOPE_DELTAS as-built amendment.)
+ADR-000 through ADR-019, plus ADR-022, are written. (Phase 2 plan originally reserved 015-016 for confidence calibration and max_turns budget; both written 2026-05-27, corrected in this registry 2026-05-28. ADR-019 = Real RAG ingestion pipeline / NCI PDQ corpus, 2026-06-06. ADR-020-021 unused — 021 folded into ADR-022 + SCOPE_DELTAS as-built amendment.)
 
 | # | Title | Status |
 |---|---|---|

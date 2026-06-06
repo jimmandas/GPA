@@ -16,6 +16,19 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
+### scope-addition: Real RAG ingestion pipeline (NCI PDQ corpus) — 2026-06-06
+
+- **Date logged:** 2026-06-06
+- **Decision:** User approved building the real parse/chunk/embed ingestion (Jim, 2026-06-06), after discovering Phase 3b never delivered it (the corpus was hand-authored YAML, not a parsed document — see Phase 3b as-built amendment below). Promotes `PHASE_3_BACKLOG.md` item #10 to active. ADR-019.
+- **Corpus decision — NOT NCCN.** The original plan named `nscl.pdf` (NCCN). **Rejected on license grounds:** the NCCN EULA (page 2) states *"you MAY NOT distribute this Content or use it with any artificial intelligence model or tool"* and the PDF is watermarked to a single licensee. Ingesting it into a RAG pipeline violates the EULA (AI use + distribution); committing derived chunks to this **public** repo would be distribution. For a *governed-AI* project that is a disqualifying own-goal (failure mode #5, Trustworthy). **Chosen instead: NCI PDQ — Non-Small Cell Lung Cancer Treatment (Health Professional Version)** — public-domain text (*"The content of PDQ documents can be used freely as text"*), same NSCLC domain, structured HTML. The licensing decision is itself a Responsible-AI credibility point.
+- **What was built:** `rag/ingest_pdq.py` (section-aware chunk + fixed fallback → embed → Chroma), corpus extracted to `rag/pdq_corpus/nsclc_hp.json` (committed, public-domain text + provenance), `tests/test_pdq_ingestion.py` (5 tests). Result: **1,737 chunks from 47 sections** embedded into Chroma `pdq_nsclc_v1`; semantic retrieval verified (Stage IIIA query returns the Stage IIIA treatment section at 0.75). Activates Determinism Contract invariants 11 (embedding pinned) + 12 (idempotent build) over a *parsed* corpus.
+- **Deliberately NOT done (sequenced):** the **live policy-mapper cutover** (YAML criteria → PDQ prose chunks). PDQ returns prose, not the discrete `passage_id`/`status` criteria the policy_mapper schema + eval dims expect. Cutting over now would destabilize the in-flight top-priority GT audit + not_applicable work. Sequence: GT audit → not_applicable → confidence-gate → THEN prose-RAG cutover (own ADR addendum). Two corpora coexist transiently: `nccn_nsclc_v5` (YAML, live) + `pdq_nsclc_v1` (PDQ, ingestion artifact, retrieval-verified, not yet wired). Logged, not hidden.
+- **Compliance guardrails (binding, in ADR-019):** text-only (PDQ images carry separate permissions); chunks attributed as *source: NCI PDQ* with citation, never claimed to BE an official PDQ summary; preferred citation carried in corpus metadata.
+- **Honest claim this makes true:** *"Real RAG ingestion with section-aware chunking over a license-clean public-domain corpus, embedded into Chroma, with verified semantic retrieval."* What it does NOT yet claim: that PDQ is the live retrieval path (it isn't — YAML still is, pending the sequenced cutover).
+- **Traceability:** ADR-019; PHASE_3_BACKLOG #10 marked promoted.
+
+---
+
 ### scope-addition: Ground-Truth Label Audit — TOP PRIORITY — 2026-06-06
 
 - **Date logged:** 2026-06-06

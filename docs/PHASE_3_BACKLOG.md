@@ -26,6 +26,7 @@
 
 ### 10. Full RAG pipeline: parse / chunk / embed / index over a real corpus
 
+- **⏩ PROMOTED TO ACTIVE 2026-06-06 (ingestion built; ADR-019).** The parse → section-aware chunk → embed → Chroma pipeline is built and verified over a **license-clean public-domain corpus** (NCI PDQ NSCLC Treatment, Health Professional Version) — NOT the NCCN PDF (EULA prohibits AI use + distribution; see ADR-019 / SCOPE_DELTAS). 1,737 chunks from 47 sections in Chroma `pdq_nsclc_v1`; semantic retrieval verified. **Remaining (still backlog):** live policy-mapper cutover from YAML criteria → PDQ prose chunks — deferred until after the Ground-Truth Audit + not_applicable + confidence-gate work (cutover changes the criteria schema + eval dims those tasks calibrate). The original "real ingestion" half of this item is DONE; the "make it the live retrieval path" half remains.
 - **Date logged:** 2026-05-27 (expanded from "Chroma → pgvector migration" after Phase 2 RAG cut)
 - **What:** The actual RAG work the Phase 2 plan envisioned but Phase 2 did NOT deliver:
   - **Acquire source material** — public-domain clinical-guidelines corpus (NCCN is proprietary; substitutes: CDC clinical guidelines, ASCO consensus statements, USPSTF recommendations)
