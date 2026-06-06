@@ -16,6 +16,25 @@ Every approved deviation, addition, or unintentional drift gets a row. Each entr
 
 ## Active Deltas
 
+### scope-addition: Ground-Truth Label Audit — TOP PRIORITY — 2026-06-06
+
+- **Date logged:** 2026-06-06
+- **Decision:** User approved as **top scope priority** (Jim, 2026-06-06): *"lets add this as a top scope priority."*
+- **What's being added:** A rigorous audit of the 15-case ground-truth labels in `eval/ground_truth.jsonl` (`expected_overall_signal` + per-criterion `expected_criterion_status`), to make the eval trustworthy as a *scoreboard*, not just as a decision instrument.
+- **Why this is #1 (the dependency argument):** The 2026-06-05/06 eval investigation surfaced that the headline `clinical_signal_accuracy` (~0.58) is **partly measuring the labels, not the system**. The eval-critic found the GT is **internally inconsistent** for judgment-intensive cases — e.g. `case_0005 SURV-3=unmet` vs `case_0011 SURV-3=ambiguous` for materially similar "not-indicated-by-stage" situations. Every downstream eval-driven decision (the `not_applicable` status fix `task_f9bc2a32`, the confidence-gate recal `task_cd4ce4f3`, any future tuning) **validates against these labels**. With inconsistent labels you cannot tell whether a fix worked — you risk improving the score by fitting noise, or rejecting a real fix because it disagrees with a wrong label. The GT audit therefore **sequences ahead of both existing eval backlog tasks**.
+- **Deliverable:**
+  1. A written **labeling rubric** — the decision rule for assigning each criterion `met / unmet / ambiguous / not_applicable` given a case scenario, derived from clinical/NCCN logic. This rubric must incorporate the `not_applicable` category being added in `task_f9bc2a32` (the two are coupled; the rubric defines what the code must produce).
+  2. A **consistency pass** over all 15 cases, re-labeling where the rubric exposes inconsistency, with **per-change rationale logged** (fits GPA's forensic/audit ethos — the GT itself becomes auditable).
+  3. Updated `eval/ground_truth.jsonl` + a `docs/` rubric doc.
+- **Hard constraints / integrity guardrails:**
+  - **Derive the rubric from clinical/NCCN logic FIRST, then apply it blind to cases — do NOT relabel to match model output.** Label-fitting to the model is the inverse of eval-gaming and equally invalidating. The rubric must be defensible independent of what any agent currently produces.
+  - **Do NOT reintroduce Cohen's κ / multi-rater labeling.** That was explicitly removed from scope 2026-05-28 (meta-eval; doesn't move OKR1/OKR2). This is a single-rater, documented-rubric audit — rigor via an explicit, reproducible rule, not via inter-rater statistics.
+  - 15-case suite size is unchanged (the 25-30/50-75 expansion stays cut per 2026-05-27). This audits the labels we have, it does not expand the suite.
+- **Sequencing:** GT audit → then `task_f9bc2a32` (not_applicable code, validated against audited labels) → then `task_cd4ce4f3` (confidence gate).
+- **Traceability:** new backlog task spawned; rubric doc forthcoming. No ADR (process/quality task, not an architecture decision).
+
+---
+
 ### scope-addition: Phase 3b—RAG-Enhanced NCCN Guideline Retrieval + Classifier Agent — 2026-06-04
 
 - **Date logged:** 2026-06-04

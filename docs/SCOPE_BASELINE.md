@@ -185,6 +185,7 @@ ADR-000 through ADR-018 are written, plus ADR-022 (Phase 3b Classifier Agent + R
 
 Tracked in `SCOPE_DELTAS.md`. Active items:
 
+- **Ground-Truth Label Audit — TOP PRIORITY** (approved 2026-06-06). Audit the 15-case GT labels for internal consistency via a documented clinical/NCCN-derived labeling rubric (incl. `not_applicable`); relabel inconsistencies with per-change rationale. Makes the eval trustworthy as a *scoreboard*. Sequences ahead of the not_applicable + confidence-gate eval tasks (they validate against these labels). Constraints: rubric derived from clinical logic then applied blind (no label-fitting to model output); NO Cohen's κ / multi-rater (stays cut); suite stays 15 cases.
 - **Runtime confidence gate** — not in original scope; user approved adding 2026-05-27. Maps to planned ADR-015.
 - **Bias monitoring** — not in original scope/strategy; user approved adding 2026-05-27. New ADR (018+).
 - **Phase 3b — RAG-enhanced NCCN retrieval + Classifier Agent** — approved 2026-06-04, implemented + eval-validated 2026-06-05. 5-agent pipeline (Classifier → Evidence → Context → Policy Mapper[Chroma RAG] → Reasoning). Chroma+LlamaIndex over a 12-criterion NSCLC corpus (reverses 2026-05-27 Chroma removal). Activates Determinism Contract invariants 11-12. Dev-tier baseline: completion 0.21→0.47 after bug fixes; governance invariants held (AI-decision-limit 1.00, adversarial-bypass 0.00). ADR-022. Ship-tier Opus run pending.

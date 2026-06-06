@@ -19,8 +19,10 @@ clinical_signal_accuracy stuck ~0.58. Three hypotheses tested:
 **Caveats logged (don't trust without verifying):**
 - Opus cost telemetry implausible — $0.285/case ≈ Sonnet's $0.295 despite 5× list rate. SDK `total_cost_usd` likely proxy flat-rate, not per-token. Verify before publishing any Opus cost figure.
 
-## What's next (2 scoped backlog tasks spawned this session)
-1. **`task_f9bc2a32` — Add `not_applicable` criterion status + fix overall_signal precedence.** THE clinical_signal fix. Touches schemas/policy_map.json, prompts/policy_mapper.md (+hash), gates/confidence.py count, eval/dimensions.py. Guards: eval-critic review (gaming risk), case_0002 must still land does_not_meet, adversarial-bypass stays 0.00.
+## What's next (sequenced — GT audit is TOP PRIORITY, approved 2026-06-06)
+
+0. **🎯 TOP PRIORITY — Ground-Truth Label Audit** (scope-addition 2026-06-06). Audit the 15-case GT labels (`eval/ground_truth.jsonl`) for internal consistency via a documented clinical/NCCN-derived rubric (incl. `not_applicable`); relabel inconsistencies with per-change rationale; write the rubric to `docs/`. **Why #1:** the eval-critic found GT is internally inconsistent (case_0005 SURV-3=unmet vs case_0011 SURV-3=ambiguous for similar not-indicated situations), so clinical_signal ~0.58 partly measures the labels, not the system. Tasks 1 & 2 below validate against these labels — fix them first or you fit noise. **Guardrails:** derive rubric from clinical logic then apply blind (NO label-fitting to model output); NO Cohen's κ / multi-rater (stays cut); suite stays 15 cases. See SCOPE_DELTAS top entry.
+1. **`task_f9bc2a32` — Add `not_applicable` criterion status + fix overall_signal precedence.** THE clinical_signal fix. Touches schemas/policy_map.json, prompts/policy_mapper.md (+hash), gates/confidence.py count, eval/dimensions.py. Guards: eval-critic review (gaming risk), case_0002 must still land does_not_meet, adversarial-bypass stays 0.00. **Coupled to #0** — the rubric defines the not_applicable category this code must produce; sequence after the audit.
 2. **`task_cd4ce4f3` — Recalibrate confidence gate ambiguous-escalation.** The lever for completion_rate + false_escalation_rate. Gate escalates ALL ambiguous signals, contradicting its own docstring (1-2 ambiguous = assist-able). Sequence AFTER task 1 (shared ambiguous/unmet count math).
 
 **Also pending (lower priority):**
