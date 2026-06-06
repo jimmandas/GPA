@@ -19,6 +19,12 @@ clinical_signal_accuracy stuck ~0.58. Three hypotheses tested:
 **Caveats logged (don't trust without verifying):**
 - Opus cost telemetry implausible — $0.285/case ≈ Sonnet's $0.295 despite 5× list rate. SDK `total_cost_usd` likely proxy flat-rate, not per-token. Verify before publishing any Opus cost figure.
 
+## ✅ Real RAG ingestion BUILT (2026-06-06, commit b28a791, ADR-019)
+
+Closed the parse/chunk/embed gap Phase 3b never delivered. **Corpus = NCI PDQ NSCLC (public domain), NOT NCCN** — NCCN's EULA prohibits AI use + distribution, and this repo is public (would have been a governed-AI own-goal). Built: `rag/ingest_pdq.py` (section-aware chunk + fixed fallback → embed → Chroma `pdq_nsclc_v1`), `rag/pdq_corpus/nsclc_hp.json` (committed, provenance + license), 5 passing tests. 1,737 chunks / 47 sections; semantic retrieval verified. The "real RAG ingestion with chunking" claim is now TRUE.
+
+**Deliberately deferred — live policy-mapper cutover (YAML criteria → PDQ prose chunks).** PDQ returns prose, not discrete passage_id/status criteria; cutover changes the criteria schema + eval dims. Sequenced AFTER the GT audit + not_applicable + confidence-gate work (it destabilizes what they calibrate). Two corpora coexist now: `nccn_nsclc_v5` (YAML, LIVE) + `pdq_nsclc_v1` (PDQ, ingestion artifact, not yet wired). **This cutover is the remaining half of PHASE_3_BACKLOG #10.**
+
 ## What's next (sequenced — GT audit is TOP PRIORITY, approved 2026-06-06)
 
 0. **🎯 TOP PRIORITY — Ground-Truth Label Audit** (scope-addition 2026-06-06). Audit the 15-case GT labels (`eval/ground_truth.jsonl`) for internal consistency via a documented clinical/NCCN-derived rubric (incl. `not_applicable`); relabel inconsistencies with per-change rationale; write the rubric to `docs/`. **Why #1:** the eval-critic found GT is internally inconsistent (case_0005 SURV-3=unmet vs case_0011 SURV-3=ambiguous for similar not-indicated situations), so clinical_signal ~0.58 partly measures the labels, not the system. Tasks 1 & 2 below validate against these labels — fix them first or you fit noise. **Guardrails:** derive rubric from clinical logic then apply blind (NO label-fitting to model output); NO Cohen's κ / multi-rater (stays cut); suite stays 15 cases. See SCOPE_DELTAS top entry.
