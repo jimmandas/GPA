@@ -36,6 +36,7 @@ from .aggregate import aggregate_overall_signal
 from logs.bilateral_logger import get_logger, BilateralLoggerError
 from rag.retriever import FixtureRetriever, PolicyRetriever
 from rag.chroma_retriever import get_retriever as get_chroma_retriever
+from rag.chroma_retriever import get_evidence_retriever
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -341,16 +342,56 @@ async def run(findings: dict, context: dict, classification: dict, case_id: str)
         "source": "Chroma Vector Search (Phase 3b RAG)",
     }
 
-    tool_calls_made = [{
-        "name": "nccn_passage_lookup",
-        "input": {
-            "cancer_type": cancer_type,
-            "indication_category": indication_category,
-            "modality": modality,
+    # --- ADR-019 Path 2: clinical-evidence grounding from the real PDQ corpus ---
+    # Real-corpus RAG made functional in the live path: retrieve relevant clinical
+    # reference passages (1,737 PDQ chunks) to GROUND criterion reasoning. These are
+    # evidence/context, NOT criteria to mark met/unmet. Failure is non-fatal — the
+    # mapper degrades to criteria-only reasoning rather than erroring the case.
+    clinical_evidence: list = []
+    try:
+        evidence_query = (
+            f"{indication_category} {modality} for {cancer_type} "
+            f"stage {classification.get('stage', 'unknown')} — "
+            f"surveillance, staging, and treatment evidence"
+        )
+        evidence_hits = get_evidence_retriever().retrieve_evidence(
+            cancer_type=cancer_type, query_text=evidence_query, top_k=4,
+        )
+        clinical_evidence = [
+            {
+                "passage_id": e["passage_id"],
+                "section": e["section_heading"],
+                "text": e["text"],
+                "source": e["source"],
+            }
+            for e in evidence_hits
+        ]
+    except Exception as _ev_exc:  # noqa: BLE001 — grounding is best-effort
+        clinical_evidence = []
+
+    tool_calls_made = [
+        {
+            "name": "nccn_passage_lookup",
+            "input": {
+                "cancer_type": cancer_type,
+                "indication_category": indication_category,
+                "modality": modality,
+            },
+            "retriever_kind": "chroma_llamaindex",
+            "retrieved_count": len(retrieved_criteria),
         },
-        "retriever_kind": "chroma_llamaindex",
-        "retrieved_count": len(retrieved_criteria),
-    }]
+        {
+            # Audit trail for the real-corpus RAG grounding (forensic provenance).
+            "name": "pdq_evidence_grounding",
+            "input": {"cancer_type": cancer_type, "collection": "pdq_nsclc_v1"},
+            "retriever_kind": "chroma_llamaindex_semantic",
+            "retrieved_count": len(clinical_evidence),
+            "passages": [
+                {"passage_id": e["passage_id"], "section": e["section"]}
+                for e in clinical_evidence
+            ],
+        },
+    ]
 
     # --- Build prompt with pre-fetched NCCN passages ------------------------
     user_prompt = json.dumps(
@@ -359,6 +400,20 @@ async def run(findings: dict, context: dict, classification: dict, case_id: str)
             "indication_category": indication_category,
             "modality": modality,
             "nccn_passages": nccn_passages,
+            "clinical_reference": {
+                "note": (
+                    "Clinical reference passages retrieved from the NCI PDQ NSCLC "
+                    "corpus (public domain). These GROUND your reasoning about whether "
+                    "the NCCN criteria are met — they are evidence/context, NOT criteria "
+                    "to mark met/unmet. Use them to inform criterion status; do not add "
+                    "them to the criteria list."
+                ),
+                "passages": [
+                    {"section": e["section"], "text": e["text"]}
+                    for e in clinical_evidence
+                ],
+                "source": "NCI PDQ — Non-Small Cell Lung Cancer Treatment (public domain)",
+            },
             "submission_evidence": {
                 "imaging_request": {
                     "indication_text": findings.get("raw_quotes", []),

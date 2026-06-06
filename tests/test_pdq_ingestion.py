@@ -116,3 +116,27 @@ def test_chunking_is_deterministic():
     a = build_chunks(corpus)
     b = build_chunks(corpus)
     assert a == b
+
+
+# ---------------------------------------------------------------------------
+# Path 2 wiring (ADR-019): criteria retriever vs PDQ clinical-evidence retriever
+# ---------------------------------------------------------------------------
+
+def test_two_retriever_roles_target_different_collections():
+    """Criteria retriever -> nccn_nsclc_v5; evidence retriever -> pdq_nsclc_v1.
+
+    Confirms the role split is wired correctly (the PDQ real corpus feeds the
+    evidence-grounding slot, not the criteria slot). Construction is local
+    (chromadb + embed-model config); no network/embedding call is made here.
+    """
+    from rag.chroma_retriever import (
+        get_retriever, get_evidence_retriever, PDQ_COLLECTION, ChromaNcclnRetriever,
+    )
+    assert PDQ_COLLECTION == "pdq_nsclc_v1"
+    crit = get_retriever()
+    eviretr = get_evidence_retriever()
+    assert crit.collection_name == "nccn_nsclc_v5"
+    assert eviretr.collection_name == "pdq_nsclc_v1"
+    assert crit is not eviretr
+    # the evidence role exists on the retriever
+    assert hasattr(ChromaNcclnRetriever, "retrieve_evidence")

@@ -9,6 +9,14 @@ You have access to one tool:
 
 Call this tool first. Then map each criterion against the available evidence.
 
+## Clinical reference (RAG grounding)
+
+The input may include a `clinical_reference` block — passages retrieved from the NCI PDQ NSCLC corpus (public domain) by semantic search over the case. These are authoritative clinical *evidence/context* to GROUND your reasoning about whether the NCCN criteria are met. Rules:
+- Use them to inform each criterion's status (e.g., whether a stage warrants adjuvant therapy, expected surveillance intervals).
+- They are NOT criteria. Do NOT add them to the `criteria` array and do NOT assign them a status.
+- Do NOT cite `clinical_reference` in `evidence_ref` — evidence_ref must point to the submission/patient fields listed below, not to reference passages.
+- If the block is absent or empty, reason from the criteria and submission alone.
+
 ## Criterion Status Rules
 
 For each criterion, assign exactly one of:

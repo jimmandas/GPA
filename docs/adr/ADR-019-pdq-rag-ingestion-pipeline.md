@@ -1,6 +1,6 @@
 # ADR-019: Real RAG Ingestion Pipeline (NCI PDQ corpus)
 
-**Status:** Accepted (ingestion pipeline built; live policy-mapper cutover sequenced after GT audit)
+**Status:** Accepted + EXTENDED 2026-06-06 — Path 2 implemented: real PDQ corpus now LIVE as the policy-mapper's clinical-evidence grounding layer (see addendum at end)
 **Date:** 2026-06-06
 **Owner:** Jim
 **Activates:** `PHASE_3_BACKLOG.md` item #10 — "Full RAG pipeline: parse / chunk / embed / index over a real corpus"
@@ -60,3 +60,24 @@ This keeps the honest claim true today — *"real RAG ingestion with section-awa
 - **USPSTF/CDC corpus** — rejected vs PDQ (license wrinkles and/or off-domain).
 - **Full live cutover now** — rejected (destabilizes the in-flight GT audit + not_applicable work; schema/eval ripple).
 - **Map PDQ sections onto the 4 indication categories** — rejected (lossy, artificial; semantic retrieval over prose is the honest approach).
+
+---
+
+## ADDENDUM 2026-06-06 — Path 2 implemented: PDQ as live clinical-evidence grounding
+
+The original ADR sequenced the live cutover after the GT audit. **Reprioritized at Jim's direction** ("that's the whole point" — functional real-corpus RAG matters more than a stable interim eval number). Implemented **Path 2** (evidence-grounding), which is the *less* destabilizing cutover because it preserves the criteria-checklist schema and the eval target.
+
+**What Path 2 does:**
+- Criteria still come from `nccn_nsclc_v5` (the 12 authorization rules) — unchanged. The policy mapper still checks the patient against these and emits `criteria[]` with `status`.
+- NEW: the policy mapper also retrieves **clinical-evidence passages from the real PDQ corpus** (`pdq_nsclc_v1`, 1,737 chunks) via semantic search (cancer_type filter), and injects them into the prompt as a `clinical_reference` block to GROUND its criterion reasoning. PDQ passages are evidence/context, NOT criteria — the prompt forbids adding them to `criteria` or citing them in `evidence_ref`.
+- Real-corpus RAG is therefore now **functional and live**, doing real retrieval work over 1,737 chunks on every case.
+
+**Why this is the right cutover shape:** PDQ is clinical *reference knowledge*, not *authorization criteria*. Putting it in the criteria slot would be incoherent (you can't mark a textbook passage met/unmet). As a grounding layer it plays its correct role and the criteria-status schema + eval dims + GT-audit labels all stay valid.
+
+**Files:** `rag/chroma_retriever.py` (`retrieve_evidence()` + `get_evidence_retriever()` for `pdq_nsclc_v1`); `agents/policy_mapper/agent.py` (`run()` retrieves + injects evidence, records `pdq_evidence_grounding` in `tool_calls_made` for forensic provenance); `prompts/policy_mapper.md` (+ hash) clinical-reference rules; `tests/test_pdq_ingestion.py` (role-split test).
+
+**Forensic provenance:** every case's `tool_calls_made` records which PDQ passages grounded the decision (passage_id + section), captured in the decision_log — so a reviewer can reconstruct exactly what clinical evidence informed each determination.
+
+**Graceful degradation:** evidence retrieval is best-effort; failure degrades to criteria-only reasoning rather than erroring the case.
+
+**Outcome measurement now possible:** RAG was previously not an outcome lever (retrieving the same 12 criteria a lookup would). With Path 2, real-corpus retrieval genuinely informs reasoning — so the next eval vs the `eval_report_20260606_005031` baseline IS the controlled before/after for "does functional RAG grounding change outcomes." Result pending; may help (better-grounded judgments) or hurt (noisier context) — to be measured, not assumed.
