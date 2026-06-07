@@ -1,6 +1,29 @@
-# Current Task — Updated 2026-06-06 (Phase 3b eval-validated; root cause pinned)
+# Current Task — Updated 2026-06-06 (Real RAG live via Path 2; measured neutral)
 
-## 🎯 SESSION 2026-06-05/06: Phase 3b eval validation + root-cause investigation
+## 🎯 LATEST (2026-06-06 PM): Real RAG ingestion built + wired live + measured
+
+**Sequence this session (later half), newest first:**
+- `5f7f97d` — **Path 2: real PDQ corpus wired into LIVE policy mapper as clinical-evidence grounding.** Criteria still from `nccn_nsclc_v5`; PDQ (`pdq_nsclc_v1`, 1,737 chunks) retrieved semantically + injected as `clinical_reference` to ground reasoning (NOT criteria — schema/eval/GT-labels preserved). Forensic provenance in `tool_calls_made`. RAG is now genuinely functional + live.
+- `368b168` — committed parse stage (`rag/parse_pdq.py`, lxml/HTML) → full parse→chunk→embed chain reproducible from clean clone; verified byte-identical (live-fetch + local-HTML).
+- `b28a791` — real RAG ingestion (`rag/ingest_pdq.py`) over **NCI PDQ NSCLC (public domain)**. NCCN `nscl.pdf` REJECTED — EULA prohibits AI use + distribution, repo is public. ADR-019.
+- `e96dc1f` — RAG outcome-honesty position recorded in SCOPE_DELTAS.
+
+**⚖️ MEASURED FINDING — functional RAG did NOT improve outcomes (honest, valuable).**
+Controlled before/after, dev-tier Sonnet: baseline `eval_report_20260606_005031` → Path 2 `eval_report_20260606_232836`:
+- clinical_signal_accuracy: 0.583 → **0.583** (flat — the dim it should help most, unmoved)
+- completion: 0.533 → 0.427 (−0.107, within single-run noise at ~0.77 reproducibility)
+- per-case pass 5→3; reproducibility 0.76→0.773; governance invariants held (adversarial 0.00, ai_decision_limit 1.00, citation 1.00)
+- **Diagnosis: bottleneck is STRUCTURAL, not knowledge** — (1) missing `not_applicable` status, (2) confidence gate over-escalates on ambiguity, (3) noisy GT labels. Adding clinical evidence can't fix an enum gap or a broken measuring stick. RAG's value is unmeasurable until those land.
+- **Keep-vs-revert Path 2: pending Jim's call** (my lean: keep — functional-RAG capability + honest "neutral, here's why" is portfolio-credible; cost = live feature w/ no demonstrated benefit + added retrieval cost/latency).
+
+**Everything pushed to origin/main @ `5f7f97d`.**
+
+## 🔜 THE UNBLOCK (restated, now evidence-backed): Ground-Truth Audit is TOP
+The measurement proves it: RAG can't be judged until the labels are consistent + `not_applicable` exists. GT audit is **paused at the ratification checkpoint** — rubric derived (incl. `not_applicable`, blind-to-model), cases 0005/0011/0013 inconsistency confirmed, relabel proposed (all three SURV-3 → `not_applicable`; 0011 → meets_criteria). Awaiting: ratify rubric → apply (rubric doc + relabel w/ logged rationale + eval-critic) → then `not_applicable` code (`task_f9bc2a32`) → confidence-gate (`task_cd4ce4f3`).
+
+---
+
+## 🎯 SESSION 2026-06-05/06 (earlier): Phase 3b eval validation + root-cause investigation
 
 **What shipped this session (commits, newest first):**
 - `7ef241f` — Phase 3b eval investigation recorded in SCOPE_DELTAS (3 hypotheses, root cause pinned). No code change (failed prompt recal reverted).
